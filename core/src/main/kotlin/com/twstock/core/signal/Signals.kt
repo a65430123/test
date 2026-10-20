@@ -5,7 +5,8 @@ import java.time.LocalDate
 enum class SignalSide { BUY, SELL }
 
 enum class SignalSource(val label: String) {
-    BOLLINGER("布林通道"),
+    BOLLINGER("布林收回"),
+    BOLLINGER_BREAKOUT("布林突破"),
     KD("KD"),
     MACD("MACD"),
 }

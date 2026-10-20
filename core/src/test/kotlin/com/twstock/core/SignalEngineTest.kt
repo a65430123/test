@@ -88,6 +88,6 @@ class SignalEngineTest {
     fun params_validation() {
         assertTrue(IndicatorParams().validate().isEmpty())
         assertTrue(IndicatorParams(macdFast = 26, macdSlow = 12).validate().isNotEmpty())
-        assertTrue(IndicatorParams(useKd = false, useMacd = false, minConfirmations = 2).validate().isNotEmpty())
+        assertTrue(IndicatorParams(useBollingerBreakout = false, useKd = false, useMacd = false, minConfirmations = 2).validate().isNotEmpty())
     }
 }

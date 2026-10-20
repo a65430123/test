@@ -80,12 +80,28 @@ fun SettingsScreen(
             }
 
             Section("布林通道") {
-                SwitchRow("納入訊號判斷", f.useBollinger) { v -> vm.update { it.copy(useBollinger = v) } }
                 FieldRow {
                     NumberField("均線週期", f.bbPeriod, Modifier.weight(1f)) { v -> vm.update { it.copy(bbPeriod = v) } }
                     NumberField("標準差倍數", f.bbMultiplier, Modifier.weight(1f), decimal = true) { v ->
                         vm.update { it.copy(bbMultiplier = v) }
                     }
+                }
+                SwitchRow("收回訊號（跌破下軌後收回買、突破上軌後跌回賣）", f.useBollinger) { v ->
+                    vm.update { it.copy(useBollinger = v) }
+                }
+                SwitchRow("突破訊號（突破上軌買、跌破下軌賣）", f.useBollingerBreakout) { v ->
+                    vm.update { it.copy(useBollingerBreakout = v) }
+                }
+                NumberField("突破需量增倍數", f.bbBreakoutVolumeRatio, Modifier.fillMaxWidth(), decimal = true) { v ->
+                    vm.update { it.copy(bbBreakoutVolumeRatio = v) }
+                }
+                Hint("當日成交量需達前一日短期均量的幾倍才算有效突破／跌破；0 表示不檢查")
+            }
+
+            Section("成交量") {
+                FieldRow {
+                    NumberField("短期均量", f.volumeMaShort, Modifier.weight(1f)) { v -> vm.update { it.copy(volumeMaShort = v) } }
+                    NumberField("長期均量", f.volumeMaLong, Modifier.weight(1f)) { v -> vm.update { it.copy(volumeMaLong = v) } }
                 }
             }
 

@@ -23,6 +23,8 @@ object MarketColors {
     val Dif = Color(0xFFFF9800)
     val Signal = Color(0xFF1E88E5)
     val ExRight = Color(0xFF8D6E63)
+    val VolumeMaShort = Color(0xFFFF9800)
+    val VolumeMaLong = Color(0xFF1E88E5)
 
     fun forChange(change: Double?): Color = when {
         change == null || change == 0.0 -> Flat

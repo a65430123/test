@@ -15,6 +15,9 @@ data class AnalysisResult(
     val bollinger: BollingerBands,
     val kd: KdResult,
     val macd: MacdResult,
+    /** 成交量短期／長期均線（張） */
+    val volumeMaShort: List<Double?>,
+    val volumeMaLong: List<Double?>,
     val events: List<IndicatorEvent>,
     val signals: List<TradeSignal>,
 ) {
@@ -30,8 +33,11 @@ object TechnicalAnalyzer {
         val bands = Indicators.bollinger(closes, params.bbPeriod, params.bbMultiplier)
         val kd = Indicators.kd(candles, params.kdPeriod, params.kdKSmoothing, params.kdDSmoothing, params.kdInitial)
         val macd = Indicators.macd(closes, params.macdFast, params.macdSlow, params.macdSignal)
-        val events = SignalEngine.detectEvents(candles, bands, kd, macd, params)
+        val volumes = candles.map { it.volume.toDouble() }
+        val volShort = Indicators.sma(volumes, params.volumeMaShort)
+        val volLong = Indicators.sma(volumes, params.volumeMaLong)
+        val events = SignalEngine.detectEvents(candles, bands, kd, macd, params, volShort)
         val signals = SignalEngine.confirmSignals(candles, events, params)
-        return AnalysisResult(candles, bands, kd, macd, events, signals)
+        return AnalysisResult(candles, bands, kd, macd, volShort, volLong, events, signals)
     }
 }

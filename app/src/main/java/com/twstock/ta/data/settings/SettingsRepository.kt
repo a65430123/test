@@ -30,6 +30,9 @@ class SettingsRepository(context: Context) {
             params = IndicatorParams(
                 bbPeriod = p[BB_PERIOD] ?: d.bbPeriod,
                 bbMultiplier = p[BB_MULT] ?: d.bbMultiplier,
+                bbBreakoutVolumeRatio = p[BB_BREAKOUT_VOL] ?: d.bbBreakoutVolumeRatio,
+                volumeMaShort = p[VOL_MA_SHORT] ?: d.volumeMaShort,
+                volumeMaLong = p[VOL_MA_LONG] ?: d.volumeMaLong,
                 kdPeriod = p[KD_PERIOD] ?: d.kdPeriod,
                 kdKSmoothing = p[KD_K_SMOOTH] ?: d.kdKSmoothing,
                 kdDSmoothing = p[KD_D_SMOOTH] ?: d.kdDSmoothing,
@@ -40,6 +43,7 @@ class SettingsRepository(context: Context) {
                 macdSlow = p[MACD_SLOW] ?: d.macdSlow,
                 macdSignal = p[MACD_SIGNAL] ?: d.macdSignal,
                 useBollinger = p[USE_BB] ?: d.useBollinger,
+                useBollingerBreakout = p[USE_BB_BREAKOUT] ?: d.useBollingerBreakout,
                 useKd = p[USE_KD] ?: d.useKd,
                 useMacd = p[USE_MACD] ?: d.useMacd,
                 minConfirmations = p[MIN_CONFIRM] ?: d.minConfirmations,
@@ -55,6 +59,9 @@ class SettingsRepository(context: Context) {
         store.edit { p ->
             p[BB_PERIOD] = params.bbPeriod
             p[BB_MULT] = params.bbMultiplier
+            p[BB_BREAKOUT_VOL] = params.bbBreakoutVolumeRatio
+            p[VOL_MA_SHORT] = params.volumeMaShort
+            p[VOL_MA_LONG] = params.volumeMaLong
             p[KD_PERIOD] = params.kdPeriod
             p[KD_K_SMOOTH] = params.kdKSmoothing
             p[KD_D_SMOOTH] = params.kdDSmoothing
@@ -65,6 +72,7 @@ class SettingsRepository(context: Context) {
             p[MACD_SLOW] = params.macdSlow
             p[MACD_SIGNAL] = params.macdSignal
             p[USE_BB] = params.useBollinger
+            p[USE_BB_BREAKOUT] = params.useBollingerBreakout
             p[USE_KD] = params.useKd
             p[USE_MACD] = params.useMacd
             p[MIN_CONFIRM] = params.minConfirmations
@@ -83,6 +91,9 @@ class SettingsRepository(context: Context) {
     private companion object {
         val BB_PERIOD = intPreferencesKey("bb_period")
         val BB_MULT = doublePreferencesKey("bb_mult")
+        val BB_BREAKOUT_VOL = doublePreferencesKey("bb_breakout_vol")
+        val VOL_MA_SHORT = intPreferencesKey("vol_ma_short")
+        val VOL_MA_LONG = intPreferencesKey("vol_ma_long")
         val KD_PERIOD = intPreferencesKey("kd_period")
         val KD_K_SMOOTH = intPreferencesKey("kd_k_smooth")
         val KD_D_SMOOTH = intPreferencesKey("kd_d_smooth")
@@ -93,6 +104,7 @@ class SettingsRepository(context: Context) {
         val MACD_SLOW = intPreferencesKey("macd_slow")
         val MACD_SIGNAL = intPreferencesKey("macd_signal")
         val USE_BB = booleanPreferencesKey("use_bb")
+        val USE_BB_BREAKOUT = booleanPreferencesKey("use_bb_breakout")
         val USE_KD = booleanPreferencesKey("use_kd")
         val USE_MACD = booleanPreferencesKey("use_macd")
         val MIN_CONFIRM = intPreferencesKey("min_confirm")

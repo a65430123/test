@@ -109,7 +109,7 @@ fun StockChart(
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(470.dp)
+            .height(CHART_HEIGHT)
             .pointerInput(n) {
                 val axis = AXIS_WIDTH.toPx()
                 detectTransformGestures { _, pan, zoom, _ ->
@@ -135,11 +135,14 @@ fun StockChart(
         var top = 0f
         val mainRect = Pane(top + legendH, top + MAIN_HEIGHT.toPx())
         top += MAIN_HEIGHT.toPx() + gap
+        val volRect = Pane(top + legendH, top + VOLUME_HEIGHT.toPx())
+        top += VOLUME_HEIGHT.toPx() + gap
         val kdRect = Pane(top + legendH, top + KD_HEIGHT.toPx())
         top += KD_HEIGHT.toPx() + gap
         val macdRect = Pane(top + legendH, top + MACD_HEIGHT.toPx())
 
         ctx.drawMainPane(analysis, params, mainRect, selected, exRightDates, adjusted)
+        ctx.drawVolumePane(analysis, params, volRect, selected)
         ctx.drawKdPane(analysis, params, kdRect, selected)
         ctx.drawMacdPane(analysis, params, macdRect, selected)
         ctx.drawDateAxis(analysis, macdRect.bottom + 2.dp.toPx())
@@ -154,9 +157,11 @@ fun StockChart(
 private val AXIS_WIDTH = 52.dp
 private val LEGEND_HEIGHT = 16.dp
 private val PANE_GAP = 6.dp
-private val MAIN_HEIGHT = 250.dp
+private val MAIN_HEIGHT = 230.dp
+private val VOLUME_HEIGHT = 74.dp
 private val KD_HEIGHT = 90.dp
 private val MACD_HEIGHT = 100.dp
+private val CHART_HEIGHT = 530.dp
 
 private data class Pane(val top: Float, val bottom: Float) {
     fun y(v: Double, lo: Double, hi: Double): Float {
@@ -258,6 +263,48 @@ private class DrawCtx(
             }
         })
     }
+
+    fun drawVolumePane(a: AnalysisResult, p: IndicatorParams, pane: Pane, sel: Int) = with(scope) {
+        val c = a.candles
+        var hi = 0.0
+        for (i in vp.start until vp.end) {
+            hi = max(hi, c[i].volume.toDouble())
+            a.volumeMaShort[i]?.let { hi = max(hi, it) }
+            a.volumeMaLong[i]?.let { hi = max(hi, it) }
+        }
+        if (hi == 0.0) hi = 1.0
+        val top = hi
+        hi *= 1.1
+        drawGrid(pane, listOf(top / 2, top), 0.0, hi) { formatVolume(it) }
+
+        val zeroY = pane.bottom
+        val barW = max(1f, vp.barWidth * 0.7f)
+        for (i in vp.start until vp.end) {
+            val k = c[i]
+            val color = when {
+                k.close > k.open -> MarketColors.Up
+                k.close < k.open -> MarketColors.Down
+                else -> MarketColors.Flat
+            }
+            val y = pane.y(k.volume.toDouble(), 0.0, hi)
+            drawRect(color.copy(alpha = 0.75f), Offset(vp.x(i) - barW / 2, y), Size(barW, zeroY - y))
+        }
+        drawSeries(a.volumeMaShort, pane, 0.0, hi, MarketColors.VolumeMaShort)
+        drawSeries(a.volumeMaLong, pane, 0.0, hi, MarketColors.VolumeMaLong)
+        drawLegend(pane.top, buildAnnotatedString {
+            withStyle(SpanStyle(color = textColor)) { append("量 ${formatVolume(c[sel].volume.toDouble())}張  ") }
+            withStyle(SpanStyle(color = MarketColors.VolumeMaShort)) {
+                append("MA${p.volumeMaShort} ${a.volumeMaShort[sel]?.let { formatVolume(it) } ?: "--"}  ")
+            }
+            withStyle(SpanStyle(color = MarketColors.VolumeMaLong)) {
+                append("MA${p.volumeMaLong} ${a.volumeMaLong[sel]?.let { formatVolume(it) } ?: "--"}")
+            }
+        })
+    }
+
+    /** 12345 → "1.2萬"、987 → "987" */
+    private fun formatVolume(v: Double): String =
+        if (v >= 10_000) "%.1f萬".format(v / 10_000) else "%.0f".format(v)
 
     fun drawKdPane(a: AnalysisResult, p: IndicatorParams, pane: Pane, sel: Int) = with(scope) {
         drawGrid(pane, listOf(p.kdOversold, 50.0, p.kdOverbought), 0.0, 100.0) { "%.0f".format(it) }

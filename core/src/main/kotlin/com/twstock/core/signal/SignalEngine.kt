@@ -8,7 +8,9 @@ import com.twstock.core.model.IndicatorParams
 
 /**
  * 進出場規則：
- * - 布林通道：前日收盤跌破下軌、今日收回下軌之上 → 買；前日收盤突破上軌、今日跌回上軌之下 → 賣。
+ * - 布林收回：前日收盤跌破下軌、今日收回下軌之上 → 買；前日收盤突破上軌、今日跌回上軌之下 → 賣。
+ * - 布林突破：收盤由上軌之下突破上軌 → 買；收盤由下軌之上跌破下軌 → 賣。
+ *   可要求量增：當日量 ≥ bbBreakoutVolumeRatio × 前一日的短期成交量均線。
  * - KD：K 由下往上穿越 D（黃金交叉）且前日 K 位於超賣區 → 買；K 由上往下穿越 D（死亡交叉）且前日 K 位於超買區 → 賣。
  * - MACD：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
  *
@@ -24,12 +26,16 @@ object SignalEngine {
         kd: KdResult,
         macd: MacdResult,
         params: IndicatorParams,
+        volumeMa: List<Double?> = List(candles.size) { null },
     ): List<IndicatorEvent> {
         val events = mutableListOf<IndicatorEvent>()
         for (i in 1 until candles.size) {
             val date = candles[i].date
             if (params.useBollinger) bollingerEvent(i, candles, bands)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER, desc)
+            }
+            if (params.useBollingerBreakout) breakoutEvent(i, candles, bands, volumeMa, params)?.let { (side, desc) ->
+                events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER_BREAKOUT, desc)
             }
             if (params.useKd) kdEvent(i, kd, params)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.KD, desc)
@@ -87,6 +93,31 @@ object SignalEngine {
             prevClose > prevUpper && close <= upper -> SignalSide.SELL to "布林突破上軌後跌回"
             else -> null
         }
+    }
+
+    private fun breakoutEvent(
+        i: Int,
+        c: List<Candle>,
+        b: BollingerBands,
+        volumeMa: List<Double?>,
+        p: IndicatorParams,
+    ): Pair<SignalSide, String>? {
+        val prevLower = b.lower[i - 1] ?: return null
+        val prevUpper = b.upper[i - 1] ?: return null
+        val lower = b.lower[i] ?: return null
+        val upper = b.upper[i] ?: return null
+        val prevClose = c[i - 1].close
+        val close = c[i].close
+        val result = when {
+            prevClose <= prevUpper && close > upper -> SignalSide.BUY to "突破布林上軌"
+            prevClose >= prevLower && close < lower -> SignalSide.SELL to "跌破布林下軌"
+            else -> return null
+        }
+        if (p.bbBreakoutVolumeRatio <= 0.0) return result
+        val avg = volumeMa[i - 1]?.takeIf { it > 0 } ?: return null
+        val ratio = c[i].volume / avg
+        if (ratio < p.bbBreakoutVolumeRatio) return null
+        return result.first to "%s（量 %.1f 倍）".format(result.second, ratio)
     }
 
     private fun kdEvent(i: Int, kd: KdResult, p: IndicatorParams): Pair<SignalSide, String>? {
