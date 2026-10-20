@@ -33,13 +33,14 @@ data class IndicatorParams(
     val useBollingerBreakout: Boolean = true,
     val useKd: Boolean = true,
     val useMacd: Boolean = true,
-    /** 同方向需有幾個不同指標確認才產生進出場訊號。 */
+    /** 同方向需有幾個不同指標（布林通道、KD、MACD）確認才產生進出場訊號。 */
     val minConfirmations: Int = 2,
     /** 確認視窗（交易日）：在此天數內出現的同方向指標事件可互相確認。 */
     val confirmWindow: Int = 3,
 ) {
+    /** 已啟用的指標數（布林收回與布林突破合計為一個「布林通道」指標）。 */
     val enabledIndicatorCount: Int
-        get() = listOf(useBollinger, useBollingerBreakout, useKd, useMacd).count { it }
+        get() = listOf(useBollinger || useBollingerBreakout, useKd, useMacd).count { it }
 
     /** 回傳錯誤訊息清單；空清單代表參數合法。 */
     fun validate(): List<String> = buildList {
@@ -56,7 +57,7 @@ data class IndicatorParams(
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
         if (enabledIndicatorCount == 0) add("至少需啟用一個指標作為訊號來源")
-        if (minConfirmations !in 1..4) add("確認指標數需介於 1–4")
+        if (minConfirmations !in 1..3) add("確認指標數需介於 1–3")
         if (minConfirmations > enabledIndicatorCount) add("確認指標數不可大於已啟用的指標數")
         if (confirmWindow !in 1..20) add("確認視窗需介於 1–20 日")
     }

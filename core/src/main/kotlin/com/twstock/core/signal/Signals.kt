@@ -4,11 +4,18 @@ import java.time.LocalDate
 
 enum class SignalSide { BUY, SELL }
 
-enum class SignalSource(val label: String) {
-    BOLLINGER("布林收回"),
-    BOLLINGER_BREAKOUT("布林突破"),
+/** 確認機制以「指標」為單位計數；同一指標的不同規則不能互相確認。 */
+enum class ConfirmGroup(val label: String) {
+    BOLLINGER("布林通道"),
     KD("KD"),
     MACD("MACD"),
+}
+
+enum class SignalSource(val label: String, val group: ConfirmGroup) {
+    BOLLINGER("布林收回", ConfirmGroup.BOLLINGER),
+    BOLLINGER_BREAKOUT("布林突破", ConfirmGroup.BOLLINGER),
+    KD("KD", ConfirmGroup.KD),
+    MACD("MACD", ConfirmGroup.MACD),
 }
 
 /** 單一指標在某日觸發的事件。 */

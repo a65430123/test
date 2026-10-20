@@ -2,6 +2,8 @@ package com.twstock.core
 
 import com.twstock.core.model.Candle
 import com.twstock.core.model.IndicatorParams
+import com.twstock.core.signal.IndicatorEvent
+import com.twstock.core.signal.SignalEngine
 import com.twstock.core.signal.SignalSide
 import com.twstock.core.signal.SignalSource
 import org.junit.Assert.assertEquals
@@ -66,9 +68,27 @@ class BollingerBreakoutTest {
     }
 
     @Test
-    fun validation_allowsFourConfirmations() {
-        assertTrue(IndicatorParams(minConfirmations = 4).validate().isEmpty())
-        assertTrue(IndicatorParams(useBollingerBreakout = false, minConfirmations = 4).validate().isNotEmpty())
+    fun validation_bollingerRulesCountAsOneIndicator() {
+        assertTrue(IndicatorParams(minConfirmations = 3).validate().isEmpty())
+        assertTrue(IndicatorParams(minConfirmations = 4).validate().isNotEmpty())
+        assertEquals(1, onlyBreakout.copy(useBollinger = true).enabledIndicatorCount)
+        assertTrue(onlyBreakout.copy(useBollinger = true, minConfirmations = 2).validate().isNotEmpty())
         assertTrue(IndicatorParams(bbBreakoutVolumeRatio = -1.0).validate().isNotEmpty())
+    }
+
+    @Test
+    fun breakoutAndPullback_doNotConfirmEachOther_butKdDoes() {
+        val start = LocalDate.of(2024, 1, 1)
+        val candles = List(10) { Candle(start.plusDays(it.toLong()), 10.0, 10.0, 10.0, 10.0, 1) }
+        fun ev(i: Int, src: SignalSource) =
+            IndicatorEvent(i, start.plusDays(i.toLong()), SignalSide.BUY, src, src.label)
+        val bbOnly = listOf(ev(3, SignalSource.BOLLINGER_BREAKOUT), ev(4, SignalSource.BOLLINGER))
+        assertTrue(SignalEngine.confirmSignals(candles, bbOnly, IndicatorParams()).isEmpty())
+
+        val withKd = bbOnly + ev(5, SignalSource.KD)
+        val s = SignalEngine.confirmSignals(candles, withKd, IndicatorParams()).single()
+        assertEquals(5, s.index)
+        // 兩個布林規則都列在訊號說明中
+        assertEquals(3, s.events.size)
     }
 }
