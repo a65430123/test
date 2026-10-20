@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">台股技術分析</string>
+    <string name="channel_signals_name">進出場訊號</string>
+    <string name="channel_signals_desc">自選股出現技術面進出場訊號時通知</string>
+</resources>
