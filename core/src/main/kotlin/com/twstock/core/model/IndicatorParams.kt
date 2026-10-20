@@ -29,7 +29,7 @@ data class IndicatorParams(
     // 訊號判斷
     /** 布林通道收回訊號（跌破下軌後收回、突破上軌後跌回）。 */
     val useBollinger: Boolean = true,
-    /** 布林通道突破訊號（收盤突破上軌、跌破下軌）。 */
+    /** 布林通道突破訊號（收盤突破上軌賣、跌破下軌買）。 */
     val useBollingerBreakout: Boolean = true,
     val useKd: Boolean = true,
     val useMacd: Boolean = true,

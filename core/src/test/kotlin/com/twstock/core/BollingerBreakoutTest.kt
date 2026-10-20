@@ -28,21 +28,21 @@ class BollingerBreakoutTest {
         TechnicalAnalyzer.analyze(candles, p).events.filter { it.source == SignalSource.BOLLINGER_BREAKOUT }
 
     @Test
-    fun closeAboveUpperBand_isBuy() {
+    fun closeAboveUpperBand_isSell() {
         val e = breakoutEvents(series(104.0), onlyBreakout)
         assertEquals(1, e.size)
-        assertEquals(SignalSide.BUY, e[0].side)
+        assertEquals(SignalSide.SELL, e[0].side)
         assertEquals(25, e[0].index)
         assertEquals("突破布林上軌", e[0].description)
     }
 
     @Test
-    fun closeBelowLowerBand_isSell() {
+    fun closeBelowLowerBand_isBuy() {
         val r = TechnicalAnalyzer.analyze(series(96.0), onlyBreakout)
         val e = r.events.single()
-        assertEquals(SignalSide.SELL, e.side)
+        assertEquals(SignalSide.BUY, e.side)
         assertEquals("跌破布林下軌", e.description)
-        assertEquals(SignalSide.SELL, r.signals.single().side)
+        assertEquals(SignalSide.BUY, r.signals.single().side)
     }
 
     @Test

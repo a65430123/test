@@ -89,7 +89,7 @@ fun SettingsScreen(
                 SwitchRow("收回訊號（跌破下軌後收回買、突破上軌後跌回賣）", f.useBollinger) { v ->
                     vm.update { it.copy(useBollinger = v) }
                 }
-                SwitchRow("突破訊號（突破上軌買、跌破下軌賣）", f.useBollingerBreakout) { v ->
+                SwitchRow("突破訊號（突破上軌賣、跌破下軌買）", f.useBollingerBreakout) { v ->
                     vm.update { it.copy(useBollingerBreakout = v) }
                 }
                 NumberField("突破需量增倍數", f.bbBreakoutVolumeRatio, Modifier.fillMaxWidth(), decimal = true) { v ->

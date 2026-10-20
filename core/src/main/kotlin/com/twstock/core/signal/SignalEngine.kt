@@ -9,7 +9,7 @@ import com.twstock.core.model.IndicatorParams
 /**
  * 進出場規則：
  * - 布林收回：前日收盤跌破下軌、今日收回下軌之上 → 買；前日收盤突破上軌、今日跌回上軌之下 → 賣。
- * - 布林突破：收盤由上軌之下突破上軌 → 買；收盤由下軌之上跌破下軌 → 賣。
+ * - 布林突破（超買／超賣）：收盤由上軌之下突破上軌 → 賣；收盤由下軌之上跌破下軌 → 買。
  *   可要求量增：當日量 ≥ bbBreakoutVolumeRatio × 前一日的短期成交量均線。
  * - KD：K 由下往上穿越 D（黃金交叉）且前日 K 位於超賣區 → 買；K 由上往下穿越 D（死亡交叉）且前日 K 位於超買區 → 賣。
  * - MACD：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
@@ -109,8 +109,8 @@ object SignalEngine {
         val prevClose = c[i - 1].close
         val close = c[i].close
         val result = when {
-            prevClose <= prevUpper && close > upper -> SignalSide.BUY to "突破布林上軌"
-            prevClose >= prevLower && close < lower -> SignalSide.SELL to "跌破布林下軌"
+            prevClose <= prevUpper && close > upper -> SignalSide.SELL to "突破布林上軌"
+            prevClose >= prevLower && close < lower -> SignalSide.BUY to "跌破布林下軌"
             else -> return null
         }
         if (p.bbBreakoutVolumeRatio <= 0.0) return result
