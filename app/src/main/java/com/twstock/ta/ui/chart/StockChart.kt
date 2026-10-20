@@ -36,6 +36,7 @@ import com.twstock.core.AnalysisResult
 import com.twstock.core.model.IndicatorParams
 import com.twstock.core.signal.SignalSide
 import com.twstock.ta.ui.theme.MarketColors
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlin.math.abs
 import kotlin.math.floor
@@ -97,6 +98,8 @@ fun StockChart(
     params: IndicatorParams,
     state: ChartState,
     modifier: Modifier = Modifier,
+    exRightDates: Set<LocalDate> = emptySet(),
+    adjusted: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -136,7 +139,7 @@ fun StockChart(
         top += KD_HEIGHT.toPx() + gap
         val macdRect = Pane(top + legendH, top + MACD_HEIGHT.toPx())
 
-        ctx.drawMainPane(analysis, params, mainRect, selected)
+        ctx.drawMainPane(analysis, params, mainRect, selected, exRightDates, adjusted)
         ctx.drawKdPane(analysis, params, kdRect, selected)
         ctx.drawMacdPane(analysis, params, macdRect, selected)
         ctx.drawDateAxis(analysis, macdRect.bottom + 2.dp.toPx())
@@ -173,7 +176,14 @@ private class DrawCtx(
     private val labelStyle = TextStyle(fontSize = 10.sp, color = textColor)
     private val stroke = with(scope) { 1.2.dp.toPx() }
 
-    fun drawMainPane(a: AnalysisResult, p: IndicatorParams, pane: Pane, sel: Int) = with(scope) {
+    fun drawMainPane(
+        a: AnalysisResult,
+        p: IndicatorParams,
+        pane: Pane,
+        sel: Int,
+        exRightDates: Set<LocalDate>,
+        adjusted: Boolean,
+    ) = with(scope) {
         val c = a.candles
         val bb = a.bollinger
         var lo = Double.POSITIVE_INFINITY
@@ -186,6 +196,18 @@ private class DrawCtx(
         lo -= pad
         hi += pad
         drawGrid(pane, listOf(lo + (hi - lo) * 0.1, lo + (hi - lo) * 0.5, lo + (hi - lo) * 0.9), lo, hi) { "%.2f".format(it) }
+
+        // 除權息日標記：虛線 + 「除」
+        if (exRightDates.isNotEmpty()) {
+            val dash = PathEffect.dashPathEffect(floatArrayOf(4f, 4f))
+            val label = measurer.measure("除", labelStyle.copy(color = MarketColors.ExRight))
+            for (i in vp.start until vp.end) {
+                if (c[i].date !in exRightDates) continue
+                val x = vp.x(i)
+                drawLine(MarketColors.ExRight.copy(alpha = 0.5f), Offset(x, pane.top), Offset(x, pane.bottom), 1f, pathEffect = dash)
+                drawText(label, topLeft = Offset(x - label.size.width / 2f, pane.bottom - label.size.height))
+            }
+        }
 
         drawSeries(bb.upper, pane, lo, hi, MarketColors.BollingerBand)
         drawSeries(bb.lower, pane, lo, hi, MarketColors.BollingerBand)
@@ -224,6 +246,7 @@ private class DrawCtx(
         val k = c[sel]
         drawLegend(pane.top, buildAnnotatedString {
             withStyle(SpanStyle(color = textColor)) {
+                if (adjusted) append("[還原] ")
                 append("${k.date.format(DATE_FMT)} 開%.2f 高%.2f 低%.2f ".format(k.open, k.high, k.low))
             }
             withStyle(SpanStyle(color = MarketColors.forChange(k.close - k.open))) { append("收%.2f  ".format(k.close)) }

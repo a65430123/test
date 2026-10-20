@@ -11,13 +11,15 @@
 ```
 core/   純 Kotlin（JVM）模組：指標計算與訊號引擎，可獨立單元測試
   model/Candle.kt, IndicatorParams.kt
+  model/ExRightEvent.kt       除權息事件
   indicator/Indicators.kt     SMA / EMA / 布林通道 / KD / MACD
+  PriceAdjuster.kt            除權息向前還原
   signal/SignalEngine.kt      進出場規則與多指標確認
   TechnicalAnalyzer.kt        一次算完所有指標與訊號
 
 app/    Android App
   data/remote    TwseApi（上市）、TpexApi（上櫃）、TwseOpenApi（股票清單）、MarketDataParser
-  data/local     Room：stock_info、watchlist、candles
+  data/local     Room：stock_info、watchlist、candles、ex_rights
   data/repository/StockRepository   增量下載日 K、節流、加入/移除自選股
   data/settings/SettingsRepository  DataStore 儲存指標參數
   worker/SignalCheckWorker          每日 14:30（台北）更新並推播
@@ -38,6 +40,18 @@ app/    Android App
 
 KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上式）。若 9 日內最高 = 最低，RSV 以前日 K 代入（K 維持不變）。
 
+## 除權息還原價（可開關）
+
+設定頁「價格資料 → 除權息還原價」或個股頁上方的「除權息還原」chip 皆可切換，預設開啟。
+
+- 資料：證交所 TWT49U、櫃買中心 exDailyQ「除權除息計算結果表」（全市場，一次下載一段日期區間）。
+- 還原因子 = 除權息參考價 ÷ 除權息前收盤價（現金股利與股票股利皆適用）。
+- 向前還原：最新價不變，除權息日**之前**的開高低收乘上其後所有因子的連乘積；成交量不調整。
+- 開啟時布林、KD、MACD、訊號與推播都以還原價計算；圖上以「除」虛線標記除權息日（關閉時仍標記，方便辨識缺口）。
+- 自選股清單的現價、漲跌永遠顯示原始價。
+- 同步策略：首次下載 13 個月，之後每天最多一次，從最後一筆事件日期補到今天（每 3 個月一個請求，與日 K 共用節流）。
+- 因子不在 0.2–1.5 之間的資料視為異常而忽略；尚未發生（晚於最新 K 棒）的事件不套用。
+
 ## 進出場訊號規則
 
 | 指標 | 買進事件 | 賣出事件 |
@@ -56,6 +70,8 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 |---|---|
 | 上市日 K（每次一個月） | `https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY?date=yyyyMMdd&stockNo=XXXX&response=json` |
 | 上櫃日 K（每次一個月） | `https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=XXXX&date=yyyy/MM/dd&response=json` |
+| 上市除權息 | `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=yyyyMMdd&endDate=yyyyMMdd&response=json` |
+| 上櫃除權息 | `https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ?startDate=yyyy/MM/dd&endDate=yyyy/MM/dd&response=json` |
 | 上市股票清單 | `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL` |
 | 上櫃股票清單 | `https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes` |
 
@@ -76,7 +92,7 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 
 ## 已知限制 / 後續可做
 
-- 未處理除權息還原價，除權息日可能造成假的跌破下軌訊號。
+- 還原價未處理減資、分割等非除權息的股本變動。
 - 股票清單只在本地為空時下載一次。
 - 端點格式為政府網站公開資料，若官方改版需調整 `MarketDataParser` / DTO。
 - 部分舊 Android 裝置可能缺少 TWCA 根憑證，連線證交所會出現 SSL 錯誤，必要時可加入 `network_security_config` 信任該 CA。

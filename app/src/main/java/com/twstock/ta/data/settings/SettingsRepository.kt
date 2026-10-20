@@ -17,6 +17,8 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 data class AppSettings(
     val params: IndicatorParams = IndicatorParams(),
     val notificationsEnabled: Boolean = true,
+    /** 以除權息還原價計算指標與繪圖 */
+    val adjustPrices: Boolean = true,
 )
 
 class SettingsRepository(context: Context) {
@@ -44,6 +46,7 @@ class SettingsRepository(context: Context) {
                 confirmWindow = p[CONFIRM_WINDOW] ?: d.confirmWindow,
             ),
             notificationsEnabled = p[NOTIFY] ?: true,
+            adjustPrices = p[ADJUST] ?: true,
         )
     }
 
@@ -73,6 +76,10 @@ class SettingsRepository(context: Context) {
         store.edit { it[NOTIFY] = enabled }
     }
 
+    suspend fun setAdjustPrices(enabled: Boolean) {
+        store.edit { it[ADJUST] = enabled }
+    }
+
     private companion object {
         val BB_PERIOD = intPreferencesKey("bb_period")
         val BB_MULT = doublePreferencesKey("bb_mult")
@@ -91,5 +98,6 @@ class SettingsRepository(context: Context) {
         val MIN_CONFIRM = intPreferencesKey("min_confirm")
         val CONFIRM_WINDOW = intPreferencesKey("confirm_window")
         val NOTIFY = booleanPreferencesKey("notify")
+        val ADJUST = booleanPreferencesKey("adjust_prices")
     }
 }

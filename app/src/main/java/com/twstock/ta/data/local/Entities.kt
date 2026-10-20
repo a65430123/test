@@ -3,6 +3,7 @@ package com.twstock.ta.data.local
 import androidx.room.Entity
 import androidx.room.Index
 import com.twstock.core.model.Candle
+import com.twstock.core.model.ExRightEvent
 import java.time.LocalDate
 
 enum class Market(val label: String) {
@@ -43,6 +44,18 @@ data class CandleEntity(
 
 fun Candle.toEntity(code: String) =
     CandleEntity(code, date.toEpochDay(), open, high, low, close, volume)
+
+/** 除權除息事件（全市場皆儲存，加入新自選股時不需重新下載）。 */
+@Entity(tableName = "ex_rights", primaryKeys = ["code", "epochDay"])
+data class ExRightEntity(
+    val code: String,
+    val epochDay: Long,
+    val market: Market,
+    val closeBefore: Double,
+    val referencePrice: Double,
+) {
+    fun toModel() = ExRightEvent(LocalDate.ofEpochDay(epochDay), closeBefore, referencePrice)
+}
 
 /** 自選股清單列：自選股 + 最新兩日收盤價。 */
 data class WatchlistRow(

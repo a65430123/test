@@ -1,8 +1,11 @@
 package com.twstock.ta.data.repository
 
 import com.google.gson.JsonObject
+import com.twstock.core.PriceAdjuster
 import com.twstock.core.model.Candle
+import com.twstock.core.model.ExRightEvent
 import com.twstock.ta.data.local.AppDatabase
+import com.twstock.ta.data.local.ExRightEntity
 import com.twstock.ta.data.local.Market
 import com.twstock.ta.data.local.StockInfoEntity
 import com.twstock.ta.data.local.WatchlistEntity
@@ -14,6 +17,7 @@ import com.twstock.ta.data.remote.TwseApi
 import com.twstock.ta.data.remote.TwseOpenApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -21,6 +25,16 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+/**
+ * @param candles 依設定為原始價或還原價
+ * @param exRightDates 除權息日（圖表標記用，不論是否還原皆提供）
+ */
+data class PriceSeries(
+    val candles: List<Candle>,
+    val exRightDates: Set<LocalDate>,
+    val adjusted: Boolean,
+)
 
 class StockRepository(
     private val db: AppDatabase,
@@ -31,10 +45,14 @@ class StockRepository(
     private val infoDao = db.stockInfoDao()
     private val watchlistDao = db.watchlistDao()
     private val candleDao = db.candleDao()
+    private val exRightDao = db.exRightDao()
 
     /** 證交所對短時間大量請求會暫時封鎖 IP，所有月資料請求共用節流。 */
     private val throttle = Mutex()
     private var lastRequestAt = 0L
+
+    private val exRightSyncLock = Mutex()
+    private var exRightsSyncedOn: LocalDate? = null
 
     fun observeWatchlist(): Flow<List<WatchlistRow>> = watchlistDao.observeRows()
 
@@ -42,6 +60,65 @@ class StockRepository(
         candleDao.observe(code).map { list -> list.map { it.toModel() } }
 
     suspend fun getCandles(code: String): List<Candle> = candleDao.getAll(code).map { it.toModel() }
+
+    /** 指標計算用的價格序列；adjusted = true 時為除權息還原價。 */
+    suspend fun getPriceSeries(code: String, adjusted: Boolean): PriceSeries =
+        buildSeries(getCandles(code), exRightDao.getFor(code).map { it.toModel() }, adjusted)
+
+    /** 除權息資料表有變動時發出新值。 */
+    fun observeExRightsChanges(): Flow<Int> = exRightDao.observeCount()
+
+    fun observePriceSeries(code: String, adjusted: Boolean): Flow<PriceSeries> =
+        combine(observeCandles(code), exRightDao.observeFor(code)) { candles, events ->
+            buildSeries(candles, events.map { it.toModel() }, adjusted)
+        }
+
+    private fun buildSeries(candles: List<Candle>, events: List<ExRightEvent>, adjusted: Boolean) = PriceSeries(
+        candles = if (adjusted) PriceAdjuster.adjust(candles, events) else candles,
+        exRightDates = events.mapTo(HashSet()) { it.exDate },
+        adjusted = adjusted,
+    )
+
+    /**
+     * 同步上市＋上櫃除權除息計算結果表（全市場）。
+     * 首次下載 [HISTORY_MONTHS]+1 個月，之後從最後一筆事件日期補到今天；同一天只同步一次。
+     */
+    suspend fun syncExRights(force: Boolean = false) = exRightSyncLock.withLock {
+        val today = LocalDate.now(TAIPEI)
+        if (!force && exRightsSyncedOn == today) return@withLock
+        for (market in Market.entries) {
+            val from = exRightDao.latestEpochDay(market)?.let(LocalDate::ofEpochDay)
+                ?: today.minusMonths(HISTORY_MONTHS + 1L)
+            var chunkStart = from
+            while (!chunkStart.isAfter(today)) {
+                val end = chunkStart.plusMonths(EX_RIGHT_CHUNK_MONTHS).minusDays(1)
+                val chunkEnd = if (end.isAfter(today)) today else end
+                val records = fetchExRights(market, chunkStart, chunkEnd)
+                if (records.isNotEmpty()) {
+                    exRightDao.upsertAll(records.map {
+                        ExRightEntity(it.code, it.event.exDate.toEpochDay(), market, it.event.closeBefore, it.event.referencePrice)
+                    })
+                }
+                chunkStart = chunkEnd.plusDays(1)
+            }
+        }
+        exRightsSyncedOn = today
+    }
+
+    private suspend fun fetchExRights(market: Market, from: LocalDate, to: LocalDate) = throttled {
+        when (market) {
+            Market.TWSE -> {
+                val r = twse.exRights(from.format(TWSE_DATE), to.format(TWSE_DATE))
+                if (r.stat?.equals("OK", ignoreCase = true) == true) MarketDataParser.parseExRights(r.fields, r.data)
+                else emptyList()
+            }
+            Market.TPEX -> {
+                val r = tpex.exRights(from.format(TPEX_DATE), to.format(TPEX_DATE))
+                val table = r.tables?.firstOrNull()
+                MarketDataParser.parseExRights(table?.fields, table?.data ?: r.aaData)
+            }
+        }
+    }
 
     suspend fun getWatchlist(): List<WatchlistEntity> = watchlistDao.getAll()
 
@@ -159,6 +236,7 @@ class StockRepository(
         val TAIPEI: ZoneId = ZoneId.of("Asia/Taipei")
         const val HISTORY_MONTHS = 12
         const val MIN_REQUEST_INTERVAL_MS = 1_500L
+        private const val EX_RIGHT_CHUNK_MONTHS = 3L
         private val TWSE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val TPEX_DATE = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     }

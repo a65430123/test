@@ -36,6 +36,8 @@ class SignalCheckWorker(
         val watchlist = repo.getWatchlist()
         if (watchlist.isEmpty()) return Result.success()
 
+        if (settings.adjustPrices) runCatching { repo.syncExRights() }
+
         var failures = 0
         for (item in watchlist) {
             try {
@@ -45,7 +47,7 @@ class SignalCheckWorker(
                 continue
             }
             if (!settings.notificationsEnabled) continue
-            val candles = repo.getCandles(item.code)
+            val candles = repo.getPriceSeries(item.code, settings.adjustPrices).candles
             if (candles.isEmpty()) continue
             val signal = TechnicalAnalyzer.analyze(candles, settings.params).signalOnLastBar ?: continue
             val latest = repo.getWatchlistItem(item.code) ?: continue

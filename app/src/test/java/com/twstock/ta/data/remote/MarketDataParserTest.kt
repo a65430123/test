@@ -43,6 +43,35 @@ class MarketDataParserTest {
     }
 
     @Test
+    fun parseRocDate_chineseFormat() {
+        assertEquals(LocalDate.of(2024, 7, 18), MarketDataParser.parseRocDate("113年07月18日"))
+    }
+
+    @Test
+    fun parseExRights_twseLayout() {
+        val fields = listOf("資料日期", "股票代號", "股票名稱", "除權息前收盤價", "除權息參考價", "權值+息值", "權/息", "漲停價格", "跌停價格", "開盤競價基準", "減除股利參考價")
+        val rows = listOf(
+            listOf("113年06月13日", "2330", "台積電", "914.00", "910.50", "3.50", "息", "1,001.00", "819.50", "910.50", "910.50"),
+            listOf("113年06月13日", "9999", "壞資料", "--", "--", "", "息", "", "", "", ""),
+        )
+        val r = MarketDataParser.parseExRights(fields, rows)
+        assertEquals(1, r.size)
+        assertEquals("2330", r[0].code)
+        assertEquals(LocalDate.of(2024, 6, 13), r[0].event.exDate)
+        assertEquals(914.0, r[0].event.closeBefore, 1e-9)
+        assertEquals(910.5, r[0].event.referencePrice, 1e-9)
+    }
+
+    @Test
+    fun parseExRights_tpexLayout_locatesColumnsByName() {
+        val fields = listOf("除權息日期", "代號", "名稱", "除權息前收盤價", "除權息參考價", "權值", "息值", "權值+息值", "權/息", "減除股利參考價")
+        val rows = listOf(listOf("113/07/18", "6488", "環球晶", "500.00", "487.50", "0", "12.5", "12.5", "息", "487.50"))
+        val r = MarketDataParser.parseExRights(fields, rows)
+        assertEquals("6488", r[0].code)
+        assertEquals(487.5, r[0].event.referencePrice, 1e-9)
+    }
+
+    @Test
     fun parseTwseName() {
         assertEquals("台積電", MarketDataParser.parseTwseName("113年10月 2330 台積電           各日成交資訊", "2330"))
         assertNull(MarketDataParser.parseTwseName(null, "2330"))

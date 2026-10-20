@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,11 +88,29 @@ fun StockDetailScreen(
                 }
                 return@Column
             }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                FilterChip(
+                    selected = data.adjusted,
+                    onClick = { vm.setAdjustPrices(!data.adjusted) },
+                    label = { Text("除權息還原") },
+                )
+                Text(
+                    if (data.adjusted) "價格與指標以還原價計算" else "原始價（除權息日可能產生缺口）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             StockChart(
                 analysis = data.analysis,
                 params = data.params,
                 state = chartState,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                exRightDates = data.exRightDates,
+                adjusted = data.adjusted,
             )
             Text(
                 "雙指縮放、左右拖曳平移、點選 K 棒查看數值",
@@ -110,7 +129,7 @@ fun StockDetailScreen(
                 contentPadding = PaddingValues(bottom = 16.dp),
             ) {
                 items(data.analysis.signals.asReversed(), key = { "${it.index}-${it.side}" }) { signal ->
-                    SignalRow(signal, onClick = { chartState.focus(signal.index, data.analysis.candles.size) })
+                    SignalRow(signal, data.adjusted, onClick = { chartState.focus(signal.index, data.analysis.candles.size) })
                 }
             }
         }
@@ -118,7 +137,7 @@ fun StockDetailScreen(
 }
 
 @Composable
-private fun SignalRow(signal: TradeSignal, onClick: () -> Unit) {
+private fun SignalRow(signal: TradeSignal, adjusted: Boolean, onClick: () -> Unit) {
     val buy = signal.side == SignalSide.BUY
     val color = if (buy) MarketColors.Up else MarketColors.Down
     Row(
@@ -131,7 +150,7 @@ private fun SignalRow(signal: TradeSignal, onClick: () -> Unit) {
     ) {
         Text(if (buy) "▲ 買" else "▼ 賣", color = color, fontWeight = FontWeight.Bold)
         Column(Modifier.weight(1f)) {
-            Text("${signal.date}　收盤 %.2f".format(signal.price), style = MaterialTheme.typography.bodyMedium)
+            Text("${signal.date}　${if (adjusted) "還原收盤" else "收盤"} %.2f".format(signal.price), style = MaterialTheme.typography.bodyMedium)
             Text(
                 signal.summary,
                 style = MaterialTheme.typography.bodySmall,

@@ -76,3 +76,22 @@ interface CandleDao {
     @Query("DELETE FROM candles WHERE code = :code")
     suspend fun deleteFor(code: String)
 }
+
+@Dao
+interface ExRightDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(items: List<ExRightEntity>)
+
+    @Query("SELECT * FROM ex_rights WHERE code = :code ORDER BY epochDay")
+    suspend fun getFor(code: String): List<ExRightEntity>
+
+    @Query("SELECT * FROM ex_rights WHERE code = :code ORDER BY epochDay")
+    fun observeFor(code: String): Flow<List<ExRightEntity>>
+
+    /** 資料表變動通知（同步完成後觸發重新計算）。 */
+    @Query("SELECT COUNT(*) FROM ex_rights")
+    fun observeCount(): Flow<Int>
+
+    @Query("SELECT MAX(epochDay) FROM ex_rights WHERE market = :market")
+    suspend fun latestEpochDay(market: Market): Long?
+}

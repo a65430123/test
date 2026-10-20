@@ -17,9 +17,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -44,13 +48,17 @@ data class WatchlistUiState(
 @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
 class WatchlistViewModel(
     private val repo: StockRepository,
-    settingsRepo: SettingsRepository,
+    private val settingsRepo: SettingsRepository,
 ) : ViewModel() {
 
     val items: StateFlow<List<WatchlistItemUi>> =
-        combine(repo.observeWatchlist(), settingsRepo.settings) { rows, settings ->
+        combine(
+            repo.observeWatchlist(),
+            settingsRepo.settings,
+            repo.observeExRightsChanges(),
+        ) { rows, settings, _ ->
             rows.map { row ->
-                val candles = repo.getCandles(row.code)
+                val candles = repo.getPriceSeries(row.code, settings.adjustPrices).candles
                 val signal = if (candles.isEmpty()) null
                 else TechnicalAnalyzer.analyze(candles, settings.params).signals.lastOrNull()
                 val change = if (row.lastClose != null && row.prevClose != null) row.lastClose - row.prevClose else null
@@ -86,6 +94,13 @@ class WatchlistViewModel(
             runCatching { repo.ensureStockList() }
                 .onFailure { showMessage("股票清單下載失敗，仍可直接輸入代號加入") }
         }
+        // 啟用還原價時（含 App 啟動、從設定頁開啟）同步除權息資料
+        viewModelScope.launch {
+            settingsRepo.settings.map { it.adjustPrices }.distinctUntilChanged().filter { it }.collect {
+                runCatching { repo.syncExRights() }
+                    .onFailure { showMessage("除權息資料下載失敗，暫以原始價計算") }
+            }
+        }
     }
 
     fun onQueryChange(q: String) {
@@ -114,6 +129,9 @@ class WatchlistViewModel(
         viewModelScope.launch {
             _state.update { it.copy(isRefreshing = true) }
             val failed = mutableListOf<String>()
+            if (settingsRepo.settings.first().adjustPrices) {
+                runCatching { repo.syncExRights() }.onFailure { failed += "除權息資料" }
+            }
             for (item in repo.getWatchlist()) {
                 runCatching { repo.refreshCandles(item.code, item.market) }
                     .onFailure { failed += item.code }

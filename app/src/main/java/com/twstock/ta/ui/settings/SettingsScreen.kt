@@ -74,6 +74,11 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Section("價格資料") {
+                SwitchRow("除權息還原價", f.adjustPrices) { v -> vm.update { it.copy(adjustPrices = v) } }
+                Hint("開啟後，除權息日之前的價格依「參考價 ÷ 除權息前收盤價」向前還原，避免除權息缺口造成假訊號。自選股清單的現價不受影響。")
+            }
+
             Section("布林通道") {
                 SwitchRow("納入訊號判斷", f.useBollinger) { v -> vm.update { it.copy(useBollinger = v) } }
                 FieldRow {

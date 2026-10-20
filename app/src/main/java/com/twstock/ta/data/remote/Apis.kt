@@ -11,7 +11,15 @@ interface TwseApi {
         @Query("date") date: String,
         @Query("stockNo") stockNo: String,
         @Query("response") response: String = "json",
-    ): TwseStockDayResponse
+    ): TwseTableResponse
+
+    /** 上市除權除息計算結果表（全市場），日期格式 yyyyMMdd */
+    @GET("rwd/zh/exRight/TWT49U")
+    suspend fun exRights(
+        @Query("startDate") startDate: String,
+        @Query("endDate") endDate: String,
+        @Query("response") response: String = "json",
+    ): TwseTableResponse
 
     companion object {
         const val BASE_URL = "https://www.twse.com.tw/"
@@ -25,7 +33,15 @@ interface TpexApi {
         @Query("code") code: String,
         @Query("date") date: String,
         @Query("response") response: String = "json",
-    ): TpexTradingStockResponse
+    ): TpexTableResponse
+
+    /** 上櫃除權除息計算結果表（全市場），日期格式 yyyy/MM/dd */
+    @GET("www/zh-tw/bulletin/exDailyQ")
+    suspend fun exRights(
+        @Query("startDate") startDate: String,
+        @Query("endDate") endDate: String,
+        @Query("response") response: String = "json",
+    ): TpexTableResponse
 
     /** 上櫃股票每日收盤行情（用於建立股票代號清單） */
     @GET("openapi/v1/tpex_mainboard_daily_close_quotes")

@@ -32,6 +32,7 @@ data class SettingsForm(
     val minConfirmations: String = "",
     val confirmWindow: String = "",
     val notificationsEnabled: Boolean = true,
+    val adjustPrices: Boolean = true,
 ) {
     fun toParams(): IndicatorParams? = runCatching {
         IndicatorParams(
@@ -55,7 +56,7 @@ data class SettingsForm(
     }.getOrNull()
 
     companion object {
-        fun from(p: IndicatorParams, notify: Boolean) = SettingsForm(
+        fun from(p: IndicatorParams, notify: Boolean, adjust: Boolean) = SettingsForm(
             bbPeriod = p.bbPeriod.toString(),
             bbMultiplier = p.bbMultiplier.toString(),
             kdPeriod = p.kdPeriod.toString(),
@@ -73,6 +74,7 @@ data class SettingsForm(
             minConfirmations = p.minConfirmations.toString(),
             confirmWindow = p.confirmWindow.toString(),
             notificationsEnabled = notify,
+            adjustPrices = adjust,
         )
     }
 }
@@ -95,7 +97,7 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             val s = repo.settings.first()
-            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled))
+            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled, s.adjustPrices))
         }
     }
 
@@ -105,7 +107,10 @@ class SettingsViewModel(
 
     fun resetDefaults() {
         _state.update {
-            it.copy(form = SettingsForm.from(IndicatorParams(), it.form.notificationsEnabled), errors = emptyList())
+            it.copy(
+                form = SettingsForm.from(IndicatorParams(), it.form.notificationsEnabled, it.form.adjustPrices),
+                errors = emptyList(),
+            )
         }
     }
 
@@ -120,6 +125,7 @@ class SettingsViewModel(
         viewModelScope.launch {
             repo.saveParams(params!!)
             repo.setNotificationsEnabled(form.notificationsEnabled)
+            repo.setAdjustPrices(form.adjustPrices)
             _state.update { it.copy(message = "已儲存設定") }
         }
     }

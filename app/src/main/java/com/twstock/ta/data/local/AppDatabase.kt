@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 class Converters {
     @TypeConverter
@@ -16,8 +18,8 @@ class Converters {
 }
 
 @Database(
-    entities = [StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class],
-    version = 1,
+    entities = [StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class, ExRightEntity::class],
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -25,10 +27,23 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun stockInfoDao(): StockInfoDao
     abstract fun watchlistDao(): WatchlistDao
     abstract fun candleDao(): CandleDao
+    abstract fun exRightDao(): ExRightDao
 
     companion object {
+        /** v2：新增除權息資料表 */
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `ex_rights` (`code` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                        "`market` TEXT NOT NULL, `closeBefore` REAL NOT NULL, `referencePrice` REAL NOT NULL, " +
+                        "PRIMARY KEY(`code`, `epochDay`))"
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "twstock.db")
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
     }
