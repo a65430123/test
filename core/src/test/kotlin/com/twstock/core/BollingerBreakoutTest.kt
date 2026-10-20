@@ -68,7 +68,7 @@ class BollingerBreakoutTest {
     @Test
     fun validation_allowsFourConfirmations() {
         assertTrue(IndicatorParams(minConfirmations = 4).validate().isEmpty())
-        assertTrue(IndicatorParams(useBollingerBreakout = false, minConfirmations = 4).validate().isNotEmpty())
+        assertTrue(IndicatorParams(minConfirmations = 5).validate().isNotEmpty())
         assertTrue(IndicatorParams(bbBreakoutVolumeRatio = -1.0).validate().isNotEmpty())
     }
 }

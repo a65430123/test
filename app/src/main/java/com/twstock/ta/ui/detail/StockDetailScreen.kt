@@ -1,6 +1,7 @@
 package com.twstock.ta.ui.detail
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -35,6 +37,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.twstock.core.model.IndicatorParams
+import com.twstock.core.model.SignalIndicator
 import com.twstock.core.signal.SignalSide
 import com.twstock.core.signal.TradeSignal
 import com.twstock.ta.ui.AppViewModelProvider
@@ -116,6 +120,15 @@ fun StockDetailScreen(
                         )
                     }
                 }
+                item(key = "signal-mode") {
+                    SignalModeSelector(
+                        params = data.params,
+                        onToggle = { indicator, selected ->
+                            vm.updateSignalParams { it.toggleIndicator(indicator, selected) }
+                        },
+                        onConfirmations = { n -> vm.updateSignalParams { it.copy(minConfirmations = n) } },
+                    )
+                }
                 item(key = "chart") {
                     // 圖表內的拖曳用於平移；要捲動頁面請從圖表外開始滑動
                     StockChart(
@@ -152,6 +165,55 @@ fun StockDetailScreen(
             }
             }
         }
+    }
+}
+
+/** 選擇以哪些指標判斷進出場訊號：單選＝只看該指標，多選時可選確認數。 */
+@Composable
+private fun SignalModeSelector(
+    params: IndicatorParams,
+    onToggle: (SignalIndicator, Boolean) -> Unit,
+    onConfirmations: (Int) -> Unit,
+) {
+    val selected = params.selectedIndicators
+    Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp)) {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("訊號來源", style = MaterialTheme.typography.labelMedium)
+            SignalIndicator.entries.forEach { indicator ->
+                val isSelected = indicator in selected
+                FilterChip(
+                    selected = isSelected,
+                    // 至少保留一個指標
+                    onClick = { if (!(isSelected && selected.size == 1)) onToggle(indicator, !isSelected) },
+                    label = { Text(indicator.label) },
+                )
+            }
+        }
+        if (selected.size > 1) {
+            Row(
+                Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("確認方式", style = MaterialTheme.typography.labelMedium)
+                (1..params.enabledRuleCount).forEach { n ->
+                    FilterChip(
+                        selected = params.requiredConfirmations == n,
+                        onClick = { onConfirmations(n) },
+                        label = { Text(if (n == 1) "任一" else "$n 個") },
+                    )
+                }
+            }
+        }
+        Text(
+            params.describeSignalMode(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

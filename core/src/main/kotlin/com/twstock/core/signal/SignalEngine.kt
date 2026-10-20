@@ -14,7 +14,8 @@ import com.twstock.core.model.IndicatorParams
  * - KD：K 由下往上穿越 D（黃金交叉）且前日 K 位於超賣區 → 買；K 由上往下穿越 D（死亡交叉）且前日 K 位於超買區 → 賣。
  * - MACD：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
  *
- * 確認機制：當日有事件觸發，且在最近 confirmWindow 個交易日內（含當日）
+ * 只選一個指標作為訊號來源時，該指標的每個事件都是訊號（不需確認）。
+ * 多選時的確認機制：當日有事件觸發，且在最近 confirmWindow 個交易日內（含當日）
  * 有至少 minConfirmations 個「不同指標」出現同方向事件，即產生訊號。
  * 同方向訊號產生後，於 confirmWindow 日內不重複發出。
  */
@@ -31,10 +32,10 @@ object SignalEngine {
         val events = mutableListOf<IndicatorEvent>()
         for (i in 1 until candles.size) {
             val date = candles[i].date
-            if (params.useBollinger) bollingerEvent(i, candles, bands)?.let { (side, desc) ->
+            if (params.bollingerPullbackActive) bollingerEvent(i, candles, bands)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER, desc)
             }
-            if (params.useBollingerBreakout) breakoutEvent(i, candles, bands, volumeMa, params)?.let { (side, desc) ->
+            if (params.bollingerBreakoutActive) breakoutEvent(i, candles, bands, volumeMa, params)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER_BREAKOUT, desc)
             }
             if (params.useKd) kdEvent(i, kd, params)?.let { (side, desc) ->
@@ -52,7 +53,7 @@ object SignalEngine {
         events: List<IndicatorEvent>,
         params: IndicatorParams,
     ): List<TradeSignal> {
-        val required = params.minConfirmations.coerceIn(1, maxOf(1, params.enabledIndicatorCount))
+        val required = params.requiredConfirmations
         val window = params.confirmWindow.coerceAtLeast(1)
         val byIndex = events.groupBy { it.index }
         val lastSignalIndex = mutableMapOf<SignalSide, Int>()

@@ -42,6 +42,7 @@ class SettingsRepository(context: Context) {
                 macdFast = p[MACD_FAST] ?: d.macdFast,
                 macdSlow = p[MACD_SLOW] ?: d.macdSlow,
                 macdSignal = p[MACD_SIGNAL] ?: d.macdSignal,
+                bollingerSignals = p[BB_SIGNALS] ?: d.bollingerSignals,
                 useBollinger = p[USE_BB] ?: d.useBollinger,
                 useBollingerBreakout = p[USE_BB_BREAKOUT] ?: d.useBollingerBreakout,
                 useKd = p[USE_KD] ?: d.useKd,
@@ -71,6 +72,7 @@ class SettingsRepository(context: Context) {
             p[MACD_FAST] = params.macdFast
             p[MACD_SLOW] = params.macdSlow
             p[MACD_SIGNAL] = params.macdSignal
+            p[BB_SIGNALS] = params.bollingerSignals
             p[USE_BB] = params.useBollinger
             p[USE_BB_BREAKOUT] = params.useBollingerBreakout
             p[USE_KD] = params.useKd
@@ -103,6 +105,7 @@ class SettingsRepository(context: Context) {
         val MACD_FAST = intPreferencesKey("macd_fast")
         val MACD_SLOW = intPreferencesKey("macd_slow")
         val MACD_SIGNAL = intPreferencesKey("macd_signal")
+        val BB_SIGNALS = booleanPreferencesKey("bb_signals")
         val USE_BB = booleanPreferencesKey("use_bb")
         val USE_BB_BREAKOUT = booleanPreferencesKey("use_bb_breakout")
         val USE_KD = booleanPreferencesKey("use_kd")

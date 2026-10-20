@@ -80,6 +80,7 @@ fun SettingsScreen(
             }
 
             Section("布林通道") {
+                SwitchRow("納入訊號判斷", f.bollingerSignals) { v -> vm.update { it.copy(bollingerSignals = v) } }
                 FieldRow {
                     NumberField("均線週期", f.bbPeriod, Modifier.weight(1f)) { v -> vm.update { it.copy(bbPeriod = v) } }
                     NumberField("標準差倍數", f.bbMultiplier, Modifier.weight(1f), decimal = true) { v ->
@@ -138,15 +139,21 @@ fun SettingsScreen(
             }
 
             Section("訊號確認") {
+                f.toParams()?.let { p ->
+                    Text("目前：${p.describeSignalMode()}", style = MaterialTheme.typography.bodyMedium)
+                }
                 FieldRow {
-                    NumberField("確認指標數", f.minConfirmations, Modifier.weight(1f)) { v ->
+                    NumberField("確認數（多選時）", f.minConfirmations, Modifier.weight(1f)) { v ->
                         vm.update { it.copy(minConfirmations = v) }
                     }
                     NumberField("確認視窗（日）", f.confirmWindow, Modifier.weight(1f)) { v ->
                         vm.update { it.copy(confirmWindow = v) }
                     }
                 }
-                Hint("在視窗天數內，需有指定數量的不同指標同時給出同方向訊號才發出進出場訊號")
+                Hint(
+                    "只選一個指標時，該指標的每個訊號都會發出。多選時，需在視窗天數內有指定數量的不同規則" +
+                        "（布林收回、布林突破、KD、MACD 各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
+                )
                 SwitchRow("收盤後推播通知", f.notificationsEnabled) { v -> vm.update { it.copy(notificationsEnabled = v) } }
             }
 

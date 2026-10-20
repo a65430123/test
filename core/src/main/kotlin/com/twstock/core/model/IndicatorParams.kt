@@ -1,5 +1,12 @@
 package com.twstock.core.model
 
+/** 可被選為進出場訊號來源的指標。 */
+enum class SignalIndicator(val label: String) {
+    BOLLINGER("布林通道"),
+    KD("KD"),
+    MACD("MACD"),
+}
+
 /**
  * 所有可於設定頁調整的指標與訊號參數。
  *
@@ -27,19 +34,65 @@ data class IndicatorParams(
     val macdSlow: Int = 26,
     val macdSignal: Int = 9,
     // 訊號判斷
+    /** 布林通道是否作為訊號來源；包含哪些規則由 useBollinger、useBollingerBreakout 決定。 */
+    val bollingerSignals: Boolean = true,
     /** 布林通道收回訊號（跌破下軌後收回、突破上軌後跌回）。 */
     val useBollinger: Boolean = true,
     /** 布林通道突破訊號（收盤突破上軌賣、跌破下軌買）。 */
     val useBollingerBreakout: Boolean = true,
+    /** KD 是否作為訊號來源 */
     val useKd: Boolean = true,
+    /** MACD 是否作為訊號來源 */
     val useMacd: Boolean = true,
-    /** 同方向需有幾個不同指標確認才產生進出場訊號。 */
+    /**
+     * 多選指標時，同方向需有幾個不同規則確認才產生進出場訊號
+     * （布林收回、布林突破、KD、MACD 各算一個）。只選一個指標時不適用。
+     */
     val minConfirmations: Int = 2,
     /** 確認視窗（交易日）：在此天數內出現的同方向指標事件可互相確認。 */
     val confirmWindow: Int = 3,
 ) {
-    val enabledIndicatorCount: Int
-        get() = listOf(useBollinger, useBollingerBreakout, useKd, useMacd).count { it }
+    val bollingerPullbackActive: Boolean get() = bollingerSignals && useBollinger
+    val bollingerBreakoutActive: Boolean get() = bollingerSignals && useBollingerBreakout
+
+    /** 目前選為訊號來源的指標。 */
+    val selectedIndicators: List<SignalIndicator>
+        get() = buildList {
+            if (bollingerPullbackActive || bollingerBreakoutActive) add(SignalIndicator.BOLLINGER)
+            if (useKd) add(SignalIndicator.KD)
+            if (useMacd) add(SignalIndicator.MACD)
+        }
+
+    /** 實際啟用的訊號規則數（布林收回、布林突破分開計算）。 */
+    val enabledRuleCount: Int
+        get() = listOf(bollingerPullbackActive, bollingerBreakoutActive, useKd, useMacd).count { it }
+
+    /** 實際需要的確認數：只選一個指標時為 1，多選時為 minConfirmations（不超過啟用的規則數）。 */
+    val requiredConfirmations: Int
+        get() = if (selectedIndicators.size <= 1) 1 else minConfirmations.coerceIn(1, enabledRuleCount)
+
+    /** 例如「只看 KD」、「布林通道＋KD＋MACD：3 日內至少 2 個同向」。 */
+    fun describeSignalMode(): String {
+        val names = selectedIndicators.joinToString("＋") { it.label }
+        return when {
+            selectedIndicators.isEmpty() -> "未選擇訊號來源"
+            selectedIndicators.size == 1 -> "只看$names"
+            requiredConfirmations == 1 -> "$names：任一觸發"
+            else -> "$names：${confirmWindow} 日內至少 $requiredConfirmations 個同向"
+        }
+    }
+
+    /** 切換某指標是否作為訊號來源。重新選回布林通道時，若兩個規則都關閉則一併開啟。 */
+    fun toggleIndicator(indicator: SignalIndicator, selected: Boolean): IndicatorParams = when (indicator) {
+        SignalIndicator.BOLLINGER ->
+            if (selected && !useBollinger && !useBollingerBreakout) {
+                copy(bollingerSignals = true, useBollinger = true, useBollingerBreakout = true)
+            } else {
+                copy(bollingerSignals = selected)
+            }
+        SignalIndicator.KD -> copy(useKd = selected)
+        SignalIndicator.MACD -> copy(useMacd = selected)
+    }
 
     /** 回傳錯誤訊息清單；空清單代表參數合法。 */
     fun validate(): List<String> = buildList {
@@ -55,9 +108,8 @@ data class IndicatorParams(
         if (kdOversold >= kdOverbought) add("KD 超賣門檻需小於超買門檻")
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
-        if (enabledIndicatorCount == 0) add("至少需啟用一個指標作為訊號來源")
+        if (selectedIndicators.isEmpty()) add("至少需選擇一個指標作為訊號來源")
         if (minConfirmations !in 1..4) add("確認指標數需介於 1–4")
-        if (minConfirmations > enabledIndicatorCount) add("確認指標數不可大於已啟用的指標數")
         if (confirmWindow !in 1..20) add("確認視窗需介於 1–20 日")
     }
 }

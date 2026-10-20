@@ -75,6 +75,14 @@ class StockDetailViewModel(
         }
     }
 
+    /** 更新訊號來源／確認方式（全域設定，自選股清單與推播一併套用）。 */
+    fun updateSignalParams(transform: (IndicatorParams) -> IndicatorParams) {
+        viewModelScope.launch {
+            val next = transform(settingsRepo.settings.first().params)
+            if (next.validate().isEmpty()) settingsRepo.saveParams(next)
+        }
+    }
+
     fun setAdjustPrices(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepo.setAdjustPrices(enabled)

@@ -71,6 +71,7 @@ fun WatchlistScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val query by vm.searchQuery.collectAsStateWithLifecycle()
     val results by vm.searchResults.collectAsStateWithLifecycle()
+    val signalMode by vm.signalMode.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     var showAdd by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by remember { mutableStateOf<WatchlistItemUi?>(null) }
@@ -102,19 +103,29 @@ fun WatchlistScreen(
             onRefresh = vm::refreshAll,
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
-            if (items.isEmpty()) {
-                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text("尚無自選股，點右下角 + 加入", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.fillMaxSize()) {
+                if (signalMode.isNotEmpty()) {
+                    Text(
+                        "訊號：$signalMode",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    )
                 }
-            } else {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(items, key = { it.code }) { item ->
-                        WatchlistRow(
-                            item = item,
-                            onClick = { onOpenStock(item.code) },
-                            onLongClick = { pendingDelete = item },
-                        )
-                        HorizontalDivider()
+                if (items.isEmpty()) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text("尚無自選股，點右下角 + 加入", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                } else {
+                    LazyColumn(Modifier.fillMaxSize()) {
+                        items(items, key = { it.code }) { item ->
+                            WatchlistRow(
+                                item = item,
+                                onClick = { onOpenStock(item.code) },
+                                onLongClick = { pendingDelete = item },
+                            )
+                            HorizontalDivider()
+                        }
                     }
                 }
             }

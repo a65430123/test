@@ -78,6 +78,11 @@ class WatchlistViewModel(
             .flowOn(Dispatchers.Default)
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    /** 目前的訊號判斷方式，例如「只看KD」。 */
+    val signalMode: StateFlow<String> = settingsRepo.settings
+        .map { it.params.describeSignalMode() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), "")
+
     private val _state = MutableStateFlow(WatchlistUiState())
     val state: StateFlow<WatchlistUiState> = _state.asStateFlow()
 
