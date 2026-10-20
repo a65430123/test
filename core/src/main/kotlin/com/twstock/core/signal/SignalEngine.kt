@@ -16,7 +16,6 @@ import com.twstock.core.model.IndicatorParams
  *
  * 確認機制：當日有事件觸發，且在最近 confirmWindow 個交易日內（含當日）
  * 有至少 minConfirmations 個「不同指標」出現同方向事件，即產生訊號。
- * 布林收回與布林突破同屬「布林通道」，彼此不能互相確認。
  * 同方向訊號產生後，於 confirmWindow 日內不重複發出。
  */
 object SignalEngine {
@@ -65,9 +64,9 @@ object SignalEngine {
                 val last = lastSignalIndex[side]
                 if (last != null && i - last < window) continue
                 val inWindow = events.filter { it.side == side && it.index in (i - window + 1)..i }
-                // 每個規則只取窗口內最近一次事件；確認數以指標（ConfirmGroup）計
+                // 每個指標只取窗口內最近一次事件
                 val distinct = inWindow.groupBy { it.source }.map { (_, list) -> list.maxBy { it.index } }
-                if (distinct.map { it.source.group }.toSet().size >= required) {
+                if (distinct.size >= required) {
                     signals += TradeSignal(
                         index = i,
                         date = candles[i].date,
