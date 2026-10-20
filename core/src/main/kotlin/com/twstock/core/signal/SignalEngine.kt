@@ -12,11 +12,14 @@ import com.twstock.core.model.IndicatorParams
  * - 布林突破（超買／超賣）：收盤由上軌之下突破上軌 → 賣；收盤由下軌之上跌破下軌 → 買。
  *   可要求量增：當日量 ≥ bbBreakoutVolumeRatio × 前一日的短期成交量均線。
  * - KD：K 由下往上穿越 D（黃金交叉）且前日 K 位於超賣區 → 買；K 由上往下穿越 D（死亡交叉）且前日 K 位於超買區 → 賣。
- * - MACD：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
+ * - KD 中檔交叉（可關閉）：前日 K 介於超賣與超買門檻之間的黃金交叉 → 買、死亡交叉 → 賣。
+ * - MACD 交叉：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
+ * - MACD 柱狀轉折：柱狀為正且前一根是本段正柱狀的最高點、今日第一根往下 → 賣；
+ *   柱狀為負且前一根是本段負柱狀的最低點、今日第一根往上 → 買。
  *
  * 只選一個指標作為訊號來源時，該指標的每個事件都是訊號（不需確認）。
  * 多選時的確認機制：當日有事件觸發，且在最近 confirmWindow 個交易日內（含當日）
- * 有至少 minConfirmations 個「不同指標」出現同方向事件，即產生訊號。
+ * 有至少 minConfirmations 個「不同規則」出現同方向事件，即產生訊號。
  * 同方向訊號產生後，於 confirmWindow 日內不重複發出。
  */
 object SignalEngine {
@@ -41,8 +44,11 @@ object SignalEngine {
             if (params.useKd) kdEvent(i, kd, params)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.KD, desc)
             }
-            if (params.useMacd) macdEvent(i, macd)?.let { (side, desc) ->
+            if (params.macdCrossActive) macdEvent(i, macd)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.MACD, desc)
+            }
+            if (params.macdHistogramActive) macdHistogramEvent(i, macd)?.let { (side, desc) ->
+                events += IndicatorEvent(i, date, side, SignalSource.MACD_HISTOGRAM, desc)
             }
         }
         return events
@@ -131,6 +137,10 @@ object SignalEngine {
                 SignalSide.BUY to "KD 低檔黃金交叉 (K=%.1f)".format(k)
             pk >= pd && k < d && pk >= p.kdOverbought ->
                 SignalSide.SELL to "KD 高檔死亡交叉 (K=%.1f)".format(k)
+            p.kdMidCross && pk > p.kdOversold && pk < p.kdOverbought && pk <= pd && k > d ->
+                SignalSide.BUY to "KD 黃金交叉 (K=%.1f)".format(k)
+            p.kdMidCross && pk > p.kdOversold && pk < p.kdOverbought && pk >= pd && k < d ->
+                SignalSide.SELL to "KD 死亡交叉 (K=%.1f)".format(k)
             else -> null
         }
     }
@@ -143,5 +153,30 @@ object SignalEngine {
             ph >= 0 && h < 0 -> SignalSide.SELL to "MACD 死亡交叉"
             else -> null
         }
+    }
+
+    private fun macdHistogramEvent(i: Int, m: MacdResult): Pair<SignalSide, String>? {
+        val ph = m.histogram[i - 1] ?: return null
+        val h = m.histogram[i] ?: return null
+        return when {
+            ph > 0 && h < ph && isRunExtreme(m.histogram, i - 1, positive = true) ->
+                SignalSide.SELL to "MACD 柱狀高點轉折向下"
+            ph < 0 && h > ph && isRunExtreme(m.histogram, i - 1, positive = false) ->
+                SignalSide.BUY to "MACD 柱狀低點轉折向上"
+            else -> null
+        }
+    }
+
+    /** hist[at] 是否為所在同號區段（往前連續同為正或同為負）的最高（正）或最低（負）值。 */
+    private fun isRunExtreme(hist: List<Double?>, at: Int, positive: Boolean): Boolean {
+        val v = hist[at] ?: return false
+        var j = at - 1
+        while (j >= 0) {
+            val x = hist[j] ?: break
+            if (positive && x <= 0 || !positive && x >= 0) break
+            if (positive && x > v || !positive && x < v) return false
+            j--
+        }
+        return true
     }
 }

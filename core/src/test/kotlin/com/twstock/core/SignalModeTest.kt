@@ -59,8 +59,9 @@ class SignalModeTest {
 
     @Test
     fun requiredConfirmations_clampedToEnabledRules() {
+        // KD、MACD 交叉、MACD 柱狀轉折共 3 個規則
         val kdMacd = IndicatorParams(bollingerSignals = false, minConfirmations = 4)
-        assertEquals(2, kdMacd.requiredConfirmations)
+        assertEquals(3, kdMacd.requiredConfirmations)
         assertTrue(kdMacd.validate().isEmpty())
     }
 

@@ -40,13 +40,19 @@ data class IndicatorParams(
     val useBollinger: Boolean = true,
     /** 布林通道突破訊號（收盤突破上軌賣、跌破下軌買）。 */
     val useBollingerBreakout: Boolean = true,
-    /** KD 是否作為訊號來源 */
+    /** KD 是否作為訊號來源（高低檔交叉固定啟用） */
     val useKd: Boolean = true,
-    /** MACD 是否作為訊號來源 */
+    /** KD 中檔交叉：高低檔以外（前日 K 介於超賣與超買門檻之間）的黃金／死亡交叉 */
+    val kdMidCross: Boolean = true,
+    /** MACD 是否作為訊號來源；包含哪些規則由 macdCross、macdHistogramTurn 決定。 */
     val useMacd: Boolean = true,
+    /** MACD 交叉訊號（DIF 穿越訊號線，即柱狀翻正／翻負） */
+    val macdCross: Boolean = true,
+    /** MACD 柱狀轉折訊號（正柱狀由最高點第一根往下賣、負柱狀由最低點第一根往上買） */
+    val macdHistogramTurn: Boolean = true,
     /**
      * 多選指標時，同方向需有幾個不同規則確認才產生進出場訊號
-     * （布林收回、布林突破、KD、MACD 各算一個）。只選一個指標時不適用。
+     * （布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）。只選一個指標時不適用。
      */
     val minConfirmations: Int = 2,
     /** 確認視窗（交易日）：在此天數內出現的同方向指標事件可互相確認。 */
@@ -54,18 +60,21 @@ data class IndicatorParams(
 ) {
     val bollingerPullbackActive: Boolean get() = bollingerSignals && useBollinger
     val bollingerBreakoutActive: Boolean get() = bollingerSignals && useBollingerBreakout
+    val macdCrossActive: Boolean get() = useMacd && macdCross
+    val macdHistogramActive: Boolean get() = useMacd && macdHistogramTurn
 
     /** 目前選為訊號來源的指標。 */
     val selectedIndicators: List<SignalIndicator>
         get() = buildList {
             if (bollingerPullbackActive || bollingerBreakoutActive) add(SignalIndicator.BOLLINGER)
             if (useKd) add(SignalIndicator.KD)
-            if (useMacd) add(SignalIndicator.MACD)
+            if (macdCrossActive || macdHistogramActive) add(SignalIndicator.MACD)
         }
 
-    /** 實際啟用的訊號規則數（布林收回、布林突破分開計算）。 */
+    /** 實際啟用的訊號規則數（布林收回、布林突破、MACD 交叉、MACD 柱狀轉折分開計算）。 */
     val enabledRuleCount: Int
-        get() = listOf(bollingerPullbackActive, bollingerBreakoutActive, useKd, useMacd).count { it }
+        get() = listOf(bollingerPullbackActive, bollingerBreakoutActive, useKd, macdCrossActive, macdHistogramActive)
+            .count { it }
 
     /** 實際需要的確認數：只選一個指標時為 1，多選時為 minConfirmations（不超過啟用的規則數）。 */
     val requiredConfirmations: Int
@@ -82,7 +91,7 @@ data class IndicatorParams(
         }
     }
 
-    /** 切換某指標是否作為訊號來源。重新選回布林通道時，若兩個規則都關閉則一併開啟。 */
+    /** 切換某指標是否作為訊號來源。重新選回布林通道或 MACD 時，若其規則都關閉則一併開啟。 */
     fun toggleIndicator(indicator: SignalIndicator, selected: Boolean): IndicatorParams = when (indicator) {
         SignalIndicator.BOLLINGER ->
             if (selected && !useBollinger && !useBollingerBreakout) {
@@ -91,7 +100,12 @@ data class IndicatorParams(
                 copy(bollingerSignals = selected)
             }
         SignalIndicator.KD -> copy(useKd = selected)
-        SignalIndicator.MACD -> copy(useMacd = selected)
+        SignalIndicator.MACD ->
+            if (selected && !macdCross && !macdHistogramTurn) {
+                copy(useMacd = true, macdCross = true, macdHistogramTurn = true)
+            } else {
+                copy(useMacd = selected)
+            }
     }
 
     /** 回傳錯誤訊息清單；空清單代表參數合法。 */
@@ -109,7 +123,7 @@ data class IndicatorParams(
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
         if (selectedIndicators.isEmpty()) add("至少需選擇一個指標作為訊號來源")
-        if (minConfirmations !in 1..4) add("確認指標數需介於 1–4")
+        if (minConfirmations !in 1..5) add("確認指標數需介於 1–5")
         if (confirmWindow !in 1..20) add("確認視窗需介於 1–20 日")
     }
 }

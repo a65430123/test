@@ -46,7 +46,10 @@ class SettingsRepository(context: Context) {
                 useBollinger = p[USE_BB] ?: d.useBollinger,
                 useBollingerBreakout = p[USE_BB_BREAKOUT] ?: d.useBollingerBreakout,
                 useKd = p[USE_KD] ?: d.useKd,
+                kdMidCross = p[KD_MID_CROSS] ?: d.kdMidCross,
                 useMacd = p[USE_MACD] ?: d.useMacd,
+                macdCross = p[MACD_CROSS] ?: d.macdCross,
+                macdHistogramTurn = p[MACD_HIST_TURN] ?: d.macdHistogramTurn,
                 minConfirmations = p[MIN_CONFIRM] ?: d.minConfirmations,
                 confirmWindow = p[CONFIRM_WINDOW] ?: d.confirmWindow,
             ),
@@ -76,7 +79,10 @@ class SettingsRepository(context: Context) {
             p[USE_BB] = params.useBollinger
             p[USE_BB_BREAKOUT] = params.useBollingerBreakout
             p[USE_KD] = params.useKd
+            p[KD_MID_CROSS] = params.kdMidCross
             p[USE_MACD] = params.useMacd
+            p[MACD_CROSS] = params.macdCross
+            p[MACD_HIST_TURN] = params.macdHistogramTurn
             p[MIN_CONFIRM] = params.minConfirmations
             p[CONFIRM_WINDOW] = params.confirmWindow
         }
@@ -109,7 +115,10 @@ class SettingsRepository(context: Context) {
         val USE_BB = booleanPreferencesKey("use_bb")
         val USE_BB_BREAKOUT = booleanPreferencesKey("use_bb_breakout")
         val USE_KD = booleanPreferencesKey("use_kd")
+        val KD_MID_CROSS = booleanPreferencesKey("kd_mid_cross")
         val USE_MACD = booleanPreferencesKey("use_macd")
+        val MACD_CROSS = booleanPreferencesKey("macd_cross")
+        val MACD_HIST_TURN = booleanPreferencesKey("macd_hist_turn")
         val MIN_CONFIRM = intPreferencesKey("min_confirm")
         val CONFIRM_WINDOW = intPreferencesKey("confirm_window")
         val NOTIFY = booleanPreferencesKey("notify")

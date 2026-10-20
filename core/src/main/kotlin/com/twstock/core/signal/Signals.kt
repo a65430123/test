@@ -8,7 +8,8 @@ enum class SignalSource(val label: String) {
     BOLLINGER("布林收回"),
     BOLLINGER_BREAKOUT("布林突破"),
     KD("KD"),
-    MACD("MACD"),
+    MACD("MACD 交叉"),
+    MACD_HISTOGRAM("MACD 柱狀轉折"),
 }
 
 /** 單一指標在某日觸發的事件。 */

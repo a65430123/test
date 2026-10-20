@@ -108,6 +108,10 @@ fun SettingsScreen(
 
             Section("KD 隨機指標") {
                 SwitchRow("納入訊號判斷", f.useKd) { v -> vm.update { it.copy(useKd = v) } }
+                Hint("固定包含：超賣區黃金交叉買、超買區死亡交叉賣")
+                SwitchRow("中檔交叉（高低檔以外的黃金交叉買、死亡交叉賣）", f.kdMidCross) { v ->
+                    vm.update { it.copy(kdMidCross = v) }
+                }
                 FieldRow {
                     NumberField("RSV 週期", f.kdPeriod, Modifier.weight(1f)) { v -> vm.update { it.copy(kdPeriod = v) } }
                     NumberField("初始值", f.kdInitial, Modifier.weight(1f), decimal = true) { v ->
@@ -131,6 +135,10 @@ fun SettingsScreen(
 
             Section("MACD") {
                 SwitchRow("納入訊號判斷", f.useMacd) { v -> vm.update { it.copy(useMacd = v) } }
+                SwitchRow("交叉訊號（DIF 上穿訊號線買、下穿賣）", f.macdCross) { v -> vm.update { it.copy(macdCross = v) } }
+                SwitchRow("柱狀轉折（最低點後第一根往上買、最高點後第一根往下賣）", f.macdHistogramTurn) { v ->
+                    vm.update { it.copy(macdHistogramTurn = v) }
+                }
                 FieldRow {
                     NumberField("快線 EMA", f.macdFast, Modifier.weight(1f)) { v -> vm.update { it.copy(macdFast = v) } }
                     NumberField("慢線 EMA", f.macdSlow, Modifier.weight(1f)) { v -> vm.update { it.copy(macdSlow = v) } }
@@ -152,7 +160,7 @@ fun SettingsScreen(
                 }
                 Hint(
                     "只選一個指標時，該指標的每個訊號都會發出。多選時，需在視窗天數內有指定數量的不同規則" +
-                        "（布林收回、布林突破、KD、MACD 各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
+                        "（布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
                 )
                 SwitchRow("收盤後推播通知", f.notificationsEnabled) { v -> vm.update { it.copy(notificationsEnabled = v) } }
             }
