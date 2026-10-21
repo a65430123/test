@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.twstock.ta.data.settings.ThemeMode
 import com.twstock.ta.ui.AppViewModelProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -44,6 +46,7 @@ fun SettingsScreen(
     vm: SettingsViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val themeMode by vm.themeMode.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val f = state.form
 
@@ -74,6 +77,19 @@ fun SettingsScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            Section("外觀") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    ThemeMode.entries.forEach { mode ->
+                        FilterChip(
+                            selected = themeMode == mode,
+                            onClick = { vm.setThemeMode(mode) },
+                            label = { Text(mode.label) },
+                        )
+                    }
+                }
+                Hint("立即套用，不需按儲存")
+            }
+
             Section("價格資料") {
                 SwitchRow("除權息還原價", f.adjustPrices) { v -> vm.update { it.copy(adjustPrices = v) } }
                 Hint("開啟後，除權息日之前的價格依「參考價 ÷ 除權息前收盤價」向前還原，避免除權息缺口造成假訊號。自選股清單的現價不受影響。")

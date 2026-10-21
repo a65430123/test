@@ -5,11 +5,15 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.twstock.core.model.IndicatorParams
 import com.twstock.ta.data.settings.SettingsRepository
+import com.twstock.ta.data.settings.ThemeMode
 import com.twstock.ta.worker.SignalCheckWorker
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -152,6 +156,14 @@ class SettingsViewModel(
             repo.setAdjustPrices(form.adjustPrices)
             _state.update { it.copy(message = "已儲存設定") }
         }
+    }
+
+    /** 外觀立即套用，不需按儲存。 */
+    val themeMode: StateFlow<ThemeMode> = repo.settings.map { it.themeMode }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ThemeMode.DARK)
+
+    fun setThemeMode(mode: ThemeMode) {
+        viewModelScope.launch { repo.setThemeMode(mode) }
     }
 
     fun checkNow() {

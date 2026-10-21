@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.twstock.core.model.IndicatorParams
 import kotlinx.coroutines.flow.Flow
@@ -14,11 +15,20 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
 
+/** 外觀：跟隨系統／淺色／深色。 */
+enum class ThemeMode(val label: String) {
+    SYSTEM("跟隨系統"),
+    LIGHT("淺色"),
+    DARK("深色"),
+}
+
 data class AppSettings(
     val params: IndicatorParams = IndicatorParams(),
     val notificationsEnabled: Boolean = true,
     /** 以除權息還原價計算指標與繪圖 */
     val adjustPrices: Boolean = true,
+    /** 外觀，預設深色 */
+    val themeMode: ThemeMode = ThemeMode.DARK,
 )
 
 class SettingsRepository(context: Context) {
@@ -56,6 +66,7 @@ class SettingsRepository(context: Context) {
             ),
             notificationsEnabled = p[NOTIFY] ?: true,
             adjustPrices = p[ADJUST] ?: true,
+            themeMode = p[THEME]?.let { name -> ThemeMode.entries.firstOrNull { it.name == name } } ?: ThemeMode.DARK,
         )
     }
 
@@ -97,6 +108,10 @@ class SettingsRepository(context: Context) {
         store.edit { it[ADJUST] = enabled }
     }
 
+    suspend fun setThemeMode(mode: ThemeMode) {
+        store.edit { it[THEME] = mode.name }
+    }
+
     private companion object {
         val BB_PERIOD = intPreferencesKey("bb_period")
         val BB_MULT = doublePreferencesKey("bb_mult")
@@ -124,5 +139,6 @@ class SettingsRepository(context: Context) {
         val CONFIRM_WINDOW = intPreferencesKey("confirm_window")
         val NOTIFY = booleanPreferencesKey("notify")
         val ADJUST = booleanPreferencesKey("adjust_prices")
+        val THEME = stringPreferencesKey("theme_mode")
     }
 }

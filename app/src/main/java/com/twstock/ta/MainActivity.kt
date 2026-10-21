@@ -6,14 +6,19 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.twstock.ta.data.settings.AppSettings
 import com.twstock.ta.notification.SignalNotifier
 import com.twstock.ta.ui.navigation.AppNavHost
 import com.twstock.ta.ui.theme.TwStockTheme
+import com.twstock.ta.ui.theme.isDark
 
 class MainActivity : ComponentActivity() {
 
@@ -31,8 +36,24 @@ class MainActivity : ComponentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        val settingsFlow = (application as TaStockApp).container.settingsRepository.settings
         setContent {
-            TwStockTheme {
+            // 設定載入前先用預設（深色），避免閃白
+            val settings by settingsFlow.collectAsStateWithLifecycle(initialValue = AppSettings())
+            val dark = settings.themeMode.isDark()
+
+            // 狀態列、導覽列圖示顏色跟著 App 的外觀，而非系統設定
+            DisposableEffect(dark) {
+                val style = if (dark) {
+                    SystemBarStyle.dark(android.graphics.Color.TRANSPARENT)
+                } else {
+                    SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+                }
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+                onDispose {}
+            }
+
+            TwStockTheme(darkTheme = dark) {
                 AppNavHost(
                     pendingStockCode = pendingStockCode,
                     onPendingConsumed = { pendingStockCode = null },
