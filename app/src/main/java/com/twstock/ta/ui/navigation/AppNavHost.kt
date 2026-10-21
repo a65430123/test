@@ -10,12 +10,14 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.twstock.ta.ui.detail.StockDetailScreen
 import com.twstock.ta.ui.screener.ScreenerScreen
+import com.twstock.ta.ui.search.SearchScreen
 import com.twstock.ta.ui.settings.SettingsScreen
 import com.twstock.ta.ui.watchlist.WatchlistScreen
 
 object Routes {
     const val WATCHLIST = "watchlist"
     const val SCREENER = "screener"
+    const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val DETAIL = "detail/{code}"
     fun detail(code: String) = "detail/${Uri.encode(code)}"
@@ -48,6 +50,7 @@ fun AppNavHost(pendingStockCode: String?, onPendingConsumed: () -> Unit) {
             WatchlistScreen(
                 onOpenStock = { nav.navigate(Routes.detail(it)) },
                 onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+                onOpenSearch = { nav.navigate(Routes.SEARCH) },
                 onNavigate = switchTab,
             )
         }
@@ -55,7 +58,14 @@ fun AppNavHost(pendingStockCode: String?, onPendingConsumed: () -> Unit) {
             ScreenerScreen(
                 onOpenStock = { nav.navigate(Routes.detail(it)) },
                 onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+                onOpenSearch = { nav.navigate(Routes.SEARCH) },
                 onNavigate = switchTab,
+            )
+        }
+        composable(Routes.SEARCH) {
+            SearchScreen(
+                onBack = { nav.popBackStack() },
+                onOpenStock = { nav.navigate(Routes.detail(it)) },
             )
         }
         composable(

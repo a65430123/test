@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.twstock.ta.TaStockApp
 import com.twstock.ta.ui.detail.StockDetailViewModel
 import com.twstock.ta.ui.screener.ScreenerViewModel
+import com.twstock.ta.ui.search.SearchViewModel
 import com.twstock.ta.ui.settings.SettingsViewModel
 import com.twstock.ta.ui.watchlist.WatchlistViewModel
 
@@ -26,6 +27,9 @@ object AppViewModelProvider {
         initializer {
             val c = app().container
             ScreenerViewModel(c.stockRepository, c.settingsRepository)
+        }
+        initializer {
+            SearchViewModel(app().container.stockRepository)
         }
         initializer {
             SettingsViewModel(app(), app().container.settingsRepository)

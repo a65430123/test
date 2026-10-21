@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -53,6 +54,7 @@ import com.twstock.ta.ui.theme.MarketColors
 fun ScreenerScreen(
     onOpenStock: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     onNavigate: (String) -> Unit,
     vm: ScreenerViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -71,6 +73,7 @@ fun ScreenerScreen(
             TopAppBar(
                 title = { Text("選股") },
                 actions = {
+                    IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "搜尋個股") }
                     IconButton(onClick = vm::refresh, enabled = !state.syncing) { Icon(Icons.Default.Refresh, "更新市場資料") }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "設定") }
                 },

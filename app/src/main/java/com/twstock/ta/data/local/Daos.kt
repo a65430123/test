@@ -24,7 +24,11 @@ interface StockInfoDao {
         """
         SELECT * FROM stock_info
         WHERE code LIKE :query || '%' OR name LIKE '%' || :query || '%'
-        ORDER BY CASE WHEN code = :query THEN 0 WHEN code LIKE :query || '%' THEN 1 ELSE 2 END, code
+        ORDER BY CASE
+            WHEN code = :query THEN 0
+            WHEN code LIKE :query || '%' THEN 1
+            WHEN name LIKE :query || '%' THEN 2
+            ELSE 3 END, length(code), code
         LIMIT 50
         """
     )
@@ -121,6 +125,10 @@ interface MarketDao {
 
     @Query("SELECT * FROM market_candles WHERE code = :code ORDER BY epochDay")
     suspend fun candlesFor(code: String): List<MarketCandleEntity>
+
+    /** 指定股票自某日起的全市場日 K（搜尋結果顯示最新收盤用）。 */
+    @Query("SELECT * FROM market_candles WHERE code IN (:codes) AND epochDay >= :since ORDER BY code, epochDay")
+    suspend fun candlesSince(codes: List<String>, since: Long): List<MarketCandleEntity>
 
     @Query("SELECT MAX(epochDay) FROM market_days WHERE hasData = 1")
     suspend fun latestTradingDay(): Long?

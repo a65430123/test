@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -68,6 +69,7 @@ private val DATE_FMT = DateTimeFormatter.ofPattern("MM/dd")
 fun WatchlistScreen(
     onOpenStock: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSearch: () -> Unit,
     onNavigate: (String) -> Unit,
     vm: WatchlistViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
@@ -92,6 +94,7 @@ fun WatchlistScreen(
             TopAppBar(
                 title = { Text("自選股") },
                 actions = {
+                    IconButton(onClick = onOpenSearch) { Icon(Icons.Default.Search, "搜尋個股") }
                     IconButton(onClick = vm::refreshAll) { Icon(Icons.Default.Refresh, "更新") }
                     IconButton(onClick = onOpenSettings) { Icon(Icons.Default.Settings, "設定") }
                 },

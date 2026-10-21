@@ -35,6 +35,22 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.concurrent.atomic.AtomicInteger
 
+/** 搜尋字串正規化：去空白、全形轉半形、英文轉大寫（代號如 00631L）。 */
+internal object StockQuery {
+    fun normalize(raw: String): String = buildString {
+        for (ch in raw) {
+            val c = if (ch in '\uFF01'..'\uFF5E') ch - 0xFEE0 else ch // 全形 ！～ → 半形
+            if (!c.isWhitespace() && c != '\u3000') append(c.uppercaseChar())
+        }
+    }
+
+    /** 看起來像完整代號（可直接向交易所查詢）：4–6 碼數字，可帶一個英文字尾。 */
+    fun looksLikeCode(q: String): Boolean = Regex("^\\d{4,6}[A-Z]?$").matches(q)
+}
+
+/** 搜尋結果顯示用的最新行情。 */
+data class QuoteSummary(val date: LocalDate, val close: Double, val changePercent: Double?)
+
 /** 日K下載月份規劃（新到舊）。 */
 internal object CandlePlan {
     /** 本月往回到本地最新資料所在月份；本地無資料則到 targetStart。 */
@@ -279,7 +295,28 @@ class StockRepository(
     suspend fun markNotified(code: String, date: LocalDate) =
         watchlistDao.setLastNotified(code, date.toEpochDay())
 
-    fun search(query: String): Flow<List<StockInfoEntity>> = infoDao.search(query.trim())
+    fun search(query: String): Flow<List<StockInfoEntity>> = infoDao.search(StockQuery.normalize(query))
+
+    /** 股票清單查無此代號時，直接向證交所／櫃買中心查詢（例如剛上市），找到會加入清單。 */
+    suspend fun lookupStock(code: String): StockInfoEntity? {
+        val c = StockQuery.normalize(code)
+        return infoDao.get(c) ?: probeStock(c)
+    }
+
+    /** 由選股的全市場資料取最新收盤與漲跌幅（未下載過則為空）。 */
+    suspend fun latestQuotes(codes: List<String>): Map<String, QuoteSummary> {
+        if (codes.isEmpty()) return emptyMap()
+        val latest = marketDao.latestTradingDay() ?: return emptyMap()
+        return marketDao.candlesSince(codes, latest - 14).groupBy { it.code }.mapNotNull { (code, rows) ->
+            val last = rows.last()
+            val prev = rows.getOrNull(rows.size - 2)
+            code to QuoteSummary(
+                date = LocalDate.ofEpochDay(last.epochDay),
+                close = last.close,
+                changePercent = prev?.takeIf { it.close != 0.0 }?.let { (last.close - it.close) / it.close * 100 },
+            )
+        }.toMap()
+    }
 
     /** 下載上市＋上櫃股票清單（僅在本地為空或強制時）。 */
     suspend fun ensureStockList(force: Boolean = false) {
