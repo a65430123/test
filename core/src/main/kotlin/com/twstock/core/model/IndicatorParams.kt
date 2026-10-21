@@ -19,6 +19,8 @@ data class IndicatorParams(
     val bbMultiplier: Double = 2.0,
     /** 布林突破訊號需量增：當日量 ≥ 倍數 × 前一日的短期均量；0 表示不檢查。 */
     val bbBreakoutVolumeRatio: Double = 0.0,
+    /** 訊號預告：收盤距布林上／下軌在此百分比內，提示即將突破／跌破 */
+    val bbNearPercent: Double = 1.0,
     // 成交量均線
     val volumeMaShort: Int = 5,
     val volumeMaLong: Int = 20,
@@ -29,6 +31,8 @@ data class IndicatorParams(
     val kdInitial: Double = 50.0,
     val kdOversold: Double = 20.0,
     val kdOverbought: Double = 80.0,
+    /** 訊號預告：K、D 差距在此值內且朝交叉方向移動，提示即將交叉 */
+    val kdNearGap: Double = 3.0,
     // MACD
     val macdFast: Int = 12,
     val macdSlow: Int = 26,
@@ -115,6 +119,8 @@ data class IndicatorParams(
         if (kdInitial !in 0.0..100.0) add("KD 初始值需介於 0–100")
         if (kdOversold !in 0.0..100.0 || kdOverbought !in 0.0..100.0) add("KD 超買/超賣門檻需介於 0–100")
         if (kdOversold >= kdOverbought) add("KD 超賣門檻需小於超買門檻")
+        if (bbNearPercent < 0.0 || bbNearPercent > 10.0) add("布林預告門檻需介於 0–10%")
+        if (kdNearGap < 0.0 || kdNearGap > 50.0) add("KD 預告差距需介於 0–50")
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
         if (selectedIndicators.isEmpty()) add("至少需選擇一個指標作為訊號來源")

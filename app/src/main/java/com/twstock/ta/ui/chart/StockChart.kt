@@ -100,6 +100,8 @@ fun StockChart(
     modifier: Modifier = Modifier,
     exRightDates: Set<LocalDate> = emptySet(),
     adjusted: Boolean = false,
+    /** 是否以空心三角形標註訊號預告 */
+    showWarnings: Boolean = false,
 ) {
     val measurer = rememberTextMeasurer()
     val textColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -141,7 +143,7 @@ fun StockChart(
         top += KD_HEIGHT.toPx() + gap
         val macdRect = Pane(top + legendH, top + MACD_HEIGHT.toPx())
 
-        ctx.drawMainPane(analysis, params, mainRect, selected, exRightDates, adjusted)
+        ctx.drawMainPane(analysis, params, mainRect, selected, exRightDates, adjusted, showWarnings)
         ctx.drawVolumePane(analysis, params, volRect, selected)
         ctx.drawKdPane(analysis, params, kdRect, selected)
         ctx.drawMacdPane(analysis, params, macdRect, selected)
@@ -188,6 +190,7 @@ private class DrawCtx(
         sel: Int,
         exRightDates: Set<LocalDate>,
         adjusted: Boolean,
+        showWarnings: Boolean,
     ) = with(scope) {
         val c = a.candles
         val bb = a.bollinger
@@ -245,6 +248,25 @@ private class DrawCtx(
             } else {
                 val y = pane.y(k.high, lo, hi) - 4.dp.toPx()
                 drawTriangle(x, y, markerSize, up = false, color = MarketColors.Down)
+            }
+        }
+
+        // 訊號預告標記（空心）；同一根 K 棒已有實心訊號時往外側錯開
+        if (showWarnings) {
+            val gap = 4.dp.toPx()
+            val warned = a.warnings.filter { it.index in vp.start until vp.end }.map { it.index to it.side }.toSet()
+            val signalled = a.signals.map { it.index to it.side }.toSet()
+            for ((index, side) in warned) {
+                val x = vp.x(index)
+                val k = c[index]
+                val shift = if ((index to side) in signalled) markerSize + gap else 0f
+                if (side == SignalSide.BUY) {
+                    val y = pane.y(k.low, lo, hi) + gap + shift
+                    drawTriangle(x, y, markerSize, up = true, color = MarketColors.Up, filled = false)
+                } else {
+                    val y = pane.y(k.high, lo, hi) - gap - shift
+                    drawTriangle(x, y, markerSize, up = false, color = MarketColors.Down, filled = false)
+                }
             }
         }
 
@@ -387,7 +409,7 @@ private class DrawCtx(
         drawPath(path, color, style = Stroke(stroke))
     }
 
-    private fun DrawScope.drawTriangle(x: Float, tipY: Float, size: Float, up: Boolean, color: Color) {
+    private fun DrawScope.drawTriangle(x: Float, tipY: Float, size: Float, up: Boolean, color: Color, filled: Boolean = true) {
         val h = size * 0.9f
         val path = Path().apply {
             if (up) {
@@ -401,7 +423,7 @@ private class DrawCtx(
             }
             close()
         }
-        drawPath(path, color)
+        if (filled) drawPath(path, color) else drawPath(path, color, style = Stroke(stroke))
     }
 
     private fun DrawScope.drawLegend(paneTop: Float, text: AnnotatedString) {

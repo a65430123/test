@@ -17,6 +17,9 @@ import kotlinx.coroutines.launch
 data class SettingsForm(
     val bbPeriod: String = "",
     val bbMultiplier: String = "",
+    val bbNearPercent: String = "",
+    val kdNearGap: String = "",
+    val showWarningMarkers: Boolean = true,
     val bbBreakoutVolumeRatio: String = "",
     val volumeMaShort: String = "",
     val volumeMaLong: String = "",
@@ -46,6 +49,8 @@ data class SettingsForm(
         IndicatorParams(
             bbPeriod = bbPeriod.trim().toInt(),
             bbMultiplier = bbMultiplier.trim().toDouble(),
+            bbNearPercent = bbNearPercent.trim().toDouble(),
+            kdNearGap = kdNearGap.trim().toDouble(),
             bbBreakoutVolumeRatio = bbBreakoutVolumeRatio.trim().toDouble(),
             volumeMaShort = volumeMaShort.trim().toInt(),
             volumeMaLong = volumeMaLong.trim().toInt(),
@@ -72,9 +77,12 @@ data class SettingsForm(
     }.getOrNull()
 
     companion object {
-        fun from(p: IndicatorParams, notify: Boolean, adjust: Boolean) = SettingsForm(
+        fun from(p: IndicatorParams, notify: Boolean, adjust: Boolean, showWarnings: Boolean) = SettingsForm(
             bbPeriod = p.bbPeriod.toString(),
             bbMultiplier = p.bbMultiplier.toString(),
+            bbNearPercent = p.bbNearPercent.toString(),
+            kdNearGap = p.kdNearGap.toString(),
+            showWarningMarkers = showWarnings,
             bbBreakoutVolumeRatio = p.bbBreakoutVolumeRatio.toString(),
             volumeMaShort = p.volumeMaShort.toString(),
             volumeMaLong = p.volumeMaLong.toString(),
@@ -121,7 +129,7 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             val s = repo.settings.first()
-            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled, s.adjustPrices))
+            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled, s.adjustPrices, s.showWarningMarkers))
         }
     }
 
@@ -132,7 +140,9 @@ class SettingsViewModel(
     fun resetDefaults() {
         _state.update {
             it.copy(
-                form = SettingsForm.from(IndicatorParams(), it.form.notificationsEnabled, it.form.adjustPrices),
+                form = SettingsForm.from(
+                    IndicatorParams(), it.form.notificationsEnabled, it.form.adjustPrices, it.form.showWarningMarkers,
+                ),
                 errors = emptyList(),
             )
         }
@@ -150,6 +160,7 @@ class SettingsViewModel(
             repo.saveParams(params!!)
             repo.setNotificationsEnabled(form.notificationsEnabled)
             repo.setAdjustPrices(form.adjustPrices)
+            repo.setShowWarningMarkers(form.showWarningMarkers)
             _state.update { it.copy(message = "已儲存設定") }
         }
     }

@@ -19,6 +19,8 @@ data class AppSettings(
     val notificationsEnabled: Boolean = true,
     /** 以除權息還原價計算指標與繪圖 */
     val adjustPrices: Boolean = true,
+    /** 在 K 線上標註訊號預告（空心三角形） */
+    val showWarningMarkers: Boolean = true,
 )
 
 class SettingsRepository(context: Context) {
@@ -30,6 +32,8 @@ class SettingsRepository(context: Context) {
             params = IndicatorParams(
                 bbPeriod = p[BB_PERIOD] ?: d.bbPeriod,
                 bbMultiplier = p[BB_MULT] ?: d.bbMultiplier,
+                bbNearPercent = p[BB_NEAR] ?: d.bbNearPercent,
+                kdNearGap = p[KD_NEAR] ?: d.kdNearGap,
                 bbBreakoutVolumeRatio = p[BB_BREAKOUT_VOL] ?: d.bbBreakoutVolumeRatio,
                 volumeMaShort = p[VOL_MA_SHORT] ?: d.volumeMaShort,
                 volumeMaLong = p[VOL_MA_LONG] ?: d.volumeMaLong,
@@ -56,6 +60,7 @@ class SettingsRepository(context: Context) {
             ),
             notificationsEnabled = p[NOTIFY] ?: true,
             adjustPrices = p[ADJUST] ?: true,
+            showWarningMarkers = p[SHOW_WARNINGS] ?: true,
         )
     }
 
@@ -64,6 +69,8 @@ class SettingsRepository(context: Context) {
         store.edit { p ->
             p[BB_PERIOD] = params.bbPeriod
             p[BB_MULT] = params.bbMultiplier
+            p[BB_NEAR] = params.bbNearPercent
+            p[KD_NEAR] = params.kdNearGap
             p[BB_BREAKOUT_VOL] = params.bbBreakoutVolumeRatio
             p[VOL_MA_SHORT] = params.volumeMaShort
             p[VOL_MA_LONG] = params.volumeMaLong
@@ -97,9 +104,16 @@ class SettingsRepository(context: Context) {
         store.edit { it[ADJUST] = enabled }
     }
 
+    suspend fun setShowWarningMarkers(enabled: Boolean) {
+        store.edit { it[SHOW_WARNINGS] = enabled }
+    }
+
     private companion object {
         val BB_PERIOD = intPreferencesKey("bb_period")
         val BB_MULT = doublePreferencesKey("bb_mult")
+        val BB_NEAR = doublePreferencesKey("bb_near")
+        val KD_NEAR = doublePreferencesKey("kd_near")
+        val SHOW_WARNINGS = booleanPreferencesKey("show_warnings")
         val BB_BREAKOUT_VOL = doublePreferencesKey("bb_breakout_vol")
         val VOL_MA_SHORT = intPreferencesKey("vol_ma_short")
         val VOL_MA_LONG = intPreferencesKey("vol_ma_long")
