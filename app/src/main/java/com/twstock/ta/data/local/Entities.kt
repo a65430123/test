@@ -3,6 +3,7 @@ package com.twstock.ta.data.local
 import androidx.room.Entity
 import androidx.room.Index
 import com.twstock.core.model.Candle
+import com.twstock.ta.data.remote.MarketDataParser
 import com.twstock.core.model.ExRightEvent
 import java.time.LocalDate
 
@@ -10,6 +11,9 @@ enum class Market(val label: String) {
     TWSE("上市"),
     TPEX("上櫃"),
 }
+
+/** 顯示用的市場別，ETF 加註，例如「上市ETF」。 */
+fun Market.labelFor(code: String): String = if (MarketDataParser.isEtf(code)) "${label}ETF" else label
 
 @Entity(tableName = "stock_info", primaryKeys = ["code"], indices = [Index("name")])
 data class StockInfoEntity(

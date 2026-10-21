@@ -27,14 +27,14 @@ import java.time.LocalDate
 
 enum class SideFilter(val label: String) { ALL("全部"), BUY("買進"), SELL("賣出") }
 
-enum class MarketFilter(val label: String) { ALL("全部"), TWSE("上市"), TPEX("上櫃") }
+/** 上市、上櫃只含股票；ETF 含上市與上櫃 ETF；全部含股票與 ETF。 */
+enum class MarketFilter(val label: String) { ALL("全部"), TWSE("上市"), TPEX("上櫃"), ETF("ETF") }
 
 data class ScreenerFilters(
     val side: SideFilter = SideFilter.ALL,
     val market: MarketFilter = MarketFilter.ALL,
     /** 最低成交量（張）；0 表示不限 */
     val minVolume: Long = 500,
-    val includeEtf: Boolean = false,
 ) {
     companion object {
         val VOLUME_OPTIONS = listOf(0L, 500L, 1000L, 5000L)
@@ -146,7 +146,6 @@ class ScreenerViewModel(
 
     private fun ScreenItem.matches(f: ScreenerFilters): Boolean {
         val isEtf = MarketDataParser.isEtf(code)
-        if (isEtf && !f.includeEtf) return false
         if (f.minVolume > 0 && hit.volume < f.minVolume) return false
         when (f.side) {
             SideFilter.BUY -> if (hit.signal.side != SignalSide.BUY) return false
@@ -155,8 +154,9 @@ class ScreenerViewModel(
         }
         return when (f.market) {
             MarketFilter.ALL -> true
-            MarketFilter.TWSE -> market == Market.TWSE
-            MarketFilter.TPEX -> market == Market.TPEX
+            MarketFilter.TWSE -> !isEtf && market == Market.TWSE
+            MarketFilter.TPEX -> !isEtf && market == Market.TPEX
+            MarketFilter.ETF -> isEtf
         }
     }
 }

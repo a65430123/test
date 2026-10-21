@@ -104,6 +104,8 @@ class MarketDataParserTest {
         assertTrue(MarketDataParser.isStock("2330"))
         assertTrue(!MarketDataParser.isStock("0050") && MarketDataParser.isEtf("0050") && MarketDataParser.isEtf("00878"))
         assertTrue(!MarketDataParser.isStock("030001") && !MarketDataParser.isEtf("2330"))
+        listOf("0056", "006208", "00631L", "00632R", "00679B").forEach { assertTrue(it, MarketDataParser.isEtf(it)) }
+        listOf("030001", "00", "0050AB", "00ABC").forEach { assertTrue(it, !MarketDataParser.isEtf(it)) }
     }
 
     @Test

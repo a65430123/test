@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.twstock.core.AnalysisResult
 import com.twstock.core.TechnicalAnalyzer
 import com.twstock.core.model.IndicatorParams
+import com.twstock.ta.data.local.labelFor
 import com.twstock.ta.data.repository.StockRepository
 import com.twstock.ta.data.settings.SettingsRepository
 import kotlinx.coroutines.Dispatchers
@@ -74,7 +75,7 @@ class StockDetailViewModel(
             _state.update {
                 it.copy(
                     name = item?.name ?: info?.name ?: code,
-                    marketLabel = (item?.market ?: info?.market)?.label.orEmpty(),
+                    marketLabel = (item?.market ?: info?.market)?.labelFor(code).orEmpty(),
                     inWatchlist = item != null,
                 )
             }

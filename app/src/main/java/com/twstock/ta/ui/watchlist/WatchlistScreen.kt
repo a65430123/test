@@ -54,6 +54,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.twstock.core.signal.SignalSide
 import com.twstock.ta.data.local.StockInfoEntity
+import com.twstock.ta.data.local.labelFor
 import com.twstock.ta.ui.AppViewModelProvider
 import com.twstock.ta.ui.navigation.MainBottomBar
 import com.twstock.ta.ui.navigation.Routes
@@ -179,7 +180,7 @@ private fun WatchlistRow(item: WatchlistItemUi, onClick: () -> Unit, onLongClick
                 Text(item.name, fontWeight = FontWeight.SemiBold)
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "${item.code}・${item.market.label}",
+                    "${item.code}・${item.market.labelFor(item.code)}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -245,7 +246,7 @@ private fun AddStockDialog(
                         ListItem(
                             modifier = Modifier.clickable { onPick(info.code) },
                             headlineContent = { Text("${info.code} ${info.name}") },
-                            supportingContent = { Text(info.market.label) },
+                            supportingContent = { Text(info.market.labelFor(info.code)) },
                             colors = ListItemDefaults.colors(
                                 containerColor = Color.Transparent,
                             ),

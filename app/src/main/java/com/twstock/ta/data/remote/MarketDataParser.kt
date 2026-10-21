@@ -110,10 +110,13 @@ object MarketDataParser {
             mustContain.all { key -> names.any { key in it } } && !t.data.isNullOrEmpty()
         }
 
-    /** 選股只看普通股（4 碼數字，不含 00 開頭的 ETF）與 ETF（00 開頭）。 */
+    /** 普通股：4 碼數字（不含 00 開頭的 ETF）。 */
     fun isStock(code: String) = code.length == 4 && code.all(Char::isDigit) && !code.startsWith("00")
 
-    fun isEtf(code: String) = code.startsWith("00") && code.length in 4..6
+    /** ETF：00 開頭的 4–6 碼，可帶一個英文字尾（例：0050、00878、006208、00631L、00632R、00679B）。 */
+    fun isEtf(code: String) = ETF_CODE.matches(code)
+
+    private val ETF_CODE = Regex("^00\\d{2,4}[A-Z]?$")
 
     /** 證交所 title 範例："113年10月 2330 台積電           各日成交資訊" → "台積電" */
     fun parseTwseName(title: String?, code: String): String? {

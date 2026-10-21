@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.twstock.core.signal.SignalSide
+import com.twstock.ta.data.local.labelFor
 import com.twstock.ta.data.repository.StockRepository
 import com.twstock.ta.ui.AppViewModelProvider
 import com.twstock.ta.ui.common.SignalTypes
@@ -151,7 +152,6 @@ private fun Filters(f: ScreenerFilters, update: ((ScreenerFilters) -> ScreenerFi
             MarketFilter.entries.forEach { m ->
                 FilterChip(selected = f.market == m, onClick = { update { it.copy(market = m) } }, label = { Text(m.label) })
             }
-            FilterChip(selected = f.includeEtf, onClick = { update { it.copy(includeEtf = !it.includeEtf) } }, label = { Text("含 ETF") })
         }
         ChipRow("成交量") {
             ScreenerFilters.VOLUME_OPTIONS.forEach { v ->
@@ -195,7 +195,7 @@ private fun ScreenRow(item: ScreenItem, onClick: () -> Unit) {
             Text(item.name, fontWeight = FontWeight.SemiBold)
             Spacer(Modifier.width(6.dp))
             Text(
-                "${item.code}${item.market?.let { "・${it.label}" } ?: ""}",
+                "${item.code}${item.market?.let { "・${it.labelFor(item.code)}" } ?: ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f),
