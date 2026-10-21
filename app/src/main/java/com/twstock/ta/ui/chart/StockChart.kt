@@ -251,12 +251,14 @@ private class DrawCtx(
             }
         }
 
-        // 訊號預告標記（空心）；同一根 K 棒已有實心訊號時往外側錯開
+        // 訊號預告標記（空心）：只標每段連續預告的第一天，避免過密；
+        // 同一根 K 棒已有實心訊號時往外側錯開
         if (showWarnings) {
             val gap = 4.dp.toPx()
-            val warned = a.warnings.filter { it.index in vp.start until vp.end }.map { it.index to it.side }.toSet()
+            val warned = a.warnings.map { it.index to it.side }.toSet()
             val signalled = a.signals.map { it.index to it.side }.toSet()
-            for ((index, side) in warned) {
+            val starts = warned.filter { (index, side) -> index in vp.start until vp.end && (index - 1 to side) !in warned }
+            for ((index, side) in starts) {
                 val x = vp.x(index)
                 val k = c[index]
                 val shift = if ((index to side) in signalled) markerSize + gap else 0f
