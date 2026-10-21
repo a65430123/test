@@ -76,6 +76,9 @@ interface CandleDao {
     @Query("SELECT MAX(epochDay) FROM candles WHERE code = :code")
     suspend fun latestEpochDay(code: String): Long?
 
+    @Query("SELECT MIN(epochDay) FROM candles WHERE code = :code")
+    suspend fun earliestEpochDay(code: String): Long?
+
     @Query("DELETE FROM candles WHERE code = :code")
     suspend fun deleteFor(code: String)
 }
@@ -115,6 +118,9 @@ interface MarketDao {
 
     @Query("SELECT * FROM market_candles ORDER BY code, epochDay")
     suspend fun allCandles(): List<MarketCandleEntity>
+
+    @Query("SELECT * FROM market_candles WHERE code = :code ORDER BY epochDay")
+    suspend fun candlesFor(code: String): List<MarketCandleEntity>
 
     @Query("SELECT MAX(epochDay) FROM market_days WHERE hasData = 1")
     suspend fun latestTradingDay(): Long?

@@ -117,8 +117,9 @@ class StockDetailViewModel(
             val market = repo.getWatchlistItem(code)?.market ?: repo.getStockInfo(code)?.market ?: return@launch
             _state.update { it.copy(isRefreshing = true, error = null) }
             val result = runCatching {
-                if (settingsRepo.settings.first().adjustPrices) repo.syncExRights()
-                repo.refreshCandles(code, market)
+                // 先用選股的全市場資料立即顯示，再優先下載本檔（新到舊），除權息最後再同步
+                repo.seedFromMarketData(code)
+                repo.refreshCandles(code, market, foreground = true)
             }
             _state.update {
                 it.copy(
@@ -126,6 +127,7 @@ class StockDetailViewModel(
                     error = result.exceptionOrNull()?.let { e -> "更新失敗：${e.message ?: e.javaClass.simpleName}" },
                 )
             }
+            if (settingsRepo.settings.first().adjustPrices) runCatching { repo.syncExRights() }
         }
     }
 }

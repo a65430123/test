@@ -5,6 +5,7 @@ import com.twstock.core.PriceAdjuster
 import com.twstock.core.model.Candle
 import com.twstock.core.model.ExRightEvent
 import com.twstock.ta.data.local.AppDatabase
+import com.twstock.ta.data.local.CandleEntity
 import com.twstock.ta.data.local.ExRightEntity
 import com.twstock.ta.data.local.MarketCandleEntity
 import com.twstock.ta.data.local.MarketDayEntity
@@ -18,6 +19,9 @@ import com.twstock.ta.data.remote.MarketDataParser
 import com.twstock.ta.data.remote.TpexApi
 import com.twstock.ta.data.remote.TwseApi
 import com.twstock.ta.data.remote.TwseOpenApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -29,6 +33,52 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicInteger
+
+/** 日K下載月份規劃（新到舊）。 */
+internal object CandlePlan {
+    /** 本月往回到本地最新資料所在月份；本地無資料則到 targetStart。 */
+    fun forward(thisMonth: YearMonth, latest: YearMonth?, targetStart: YearMonth): List<YearMonth> =
+        generateSequence(thisMonth) { it.minusMonths(1) }.takeWhile { !it.isBefore(latest ?: targetStart) }.toList()
+
+    /** 本地最早資料之前、到 targetStart 為止需補齊的月份（新到舊）。 */
+    fun backfill(earliest: YearMonth?, targetStart: YearMonth): List<YearMonth> =
+        if (earliest == null) emptyList()
+        else generateSequence(earliest.minusMonths(1)) { it.minusMonths(1) }.takeWhile { !it.isBefore(targetStart) }.toList()
+}
+
+/**
+ * 依主機節流：證交所會封鎖短時間大量請求，櫃買中心較寬鬆。
+ * 前景請求（使用者正在看的個股）優先；背景同步（選股、除權息）在前景下載期間暫停讓路。
+ */
+private class HostThrottle(private val intervalMs: Long) {
+    private val mutex = Mutex()
+    private var lastRequestAt = 0L
+    private val foreground = AtomicInteger(0)
+
+    /** 在此區塊內，背景請求暫停。 */
+    suspend fun <T> withPriority(block: suspend () -> T): T {
+        foreground.incrementAndGet()
+        try {
+            return block()
+        } finally {
+            foreground.decrementAndGet()
+        }
+    }
+
+    suspend fun <T> request(background: Boolean, block: suspend () -> T): T {
+        if (background) while (foreground.get() > 0) delay(200)
+        return mutex.withLock {
+            val wait = lastRequestAt + intervalMs - System.currentTimeMillis()
+            if (wait > 0) delay(wait)
+            try {
+                block()
+            } finally {
+                lastRequestAt = System.currentTimeMillis()
+            }
+        }
+    }
+}
 
 /**
  * @param candles 依設定為原始價或還原價
@@ -52,9 +102,12 @@ class StockRepository(
     private val exRightDao = db.exRightDao()
     private val marketDao = db.marketDao()
 
-    /** 證交所對短時間大量請求會暫時封鎖 IP，所有月資料請求共用節流。 */
-    private val throttle = Mutex()
-    private var lastRequestAt = 0L
+    private val twseThrottle = HostThrottle(TWSE_INTERVAL_MS)
+    private val tpexThrottle = HostThrottle(TPEX_INTERVAL_MS)
+    private fun throttleFor(market: Market) = if (market == Market.TWSE) twseThrottle else tpexThrottle
+
+    /** 本次執行中已確認沒有更早資料的股票（例如新上市），避免每次開啟都再查一次。 */
+    private val noOlderHistory = HashSet<String>()
 
     private val exRightSyncLock = Mutex()
     private val marketSyncLock = Mutex()
@@ -111,7 +164,7 @@ class StockRepository(
         exRightsSyncedOn = today
     }
 
-    private suspend fun fetchExRights(market: Market, from: LocalDate, to: LocalDate) = throttled {
+    private suspend fun fetchExRights(market: Market, from: LocalDate, to: LocalDate) = throttleFor(market).request(background = true) {
         when (market) {
             Market.TWSE -> {
                 val r = twse.exRights(from.format(TWSE_DATE), to.format(TWSE_DATE))
@@ -141,8 +194,9 @@ class StockRepository(
             .toList()
         val known = Market.entries.associateWith { m -> marketDao.days(m).associateBy { it.epochDay } }
         val estimate = Market.entries.sumOf { m -> pendingDays(weekdays, known.getValue(m)) }
-        var done = 0
-        for (market in Market.entries) {
+        val done = AtomicInteger(0)
+        // 上市、上櫃為不同主機、各自節流，可同時下載
+        suspend fun syncMarket(market: Market) {
             val days = known.getValue(market)
             var trading = 0
             for (date in weekdays) {
@@ -155,7 +209,8 @@ class StockRepository(
                 }
                 val quotes = fetchDailyQuotes(market, date)
                     .filter { MarketDataParser.isStock(it.code) || MarketDataParser.isEtf(it.code) }
-                onProgress(++done, maxOf(estimate, done))
+                val n = done.incrementAndGet()
+                onProgress(n, maxOf(estimate, n))
                 if (quotes.isNotEmpty()) {
                     marketDao.upsertCandles(quotes.map {
                         val c = it.candle
@@ -169,6 +224,7 @@ class StockRepository(
                 }
             }
         }
+        coroutineScope { Market.entries.map { m -> async { syncMarket(m) } }.awaitAll() }
         val oldest = weekdays.last().toEpochDay()
         marketDao.pruneCandles(oldest)
         marketDao.pruneDays(oldest)
@@ -187,7 +243,7 @@ class StockRepository(
         return pending
     }
 
-    private suspend fun fetchDailyQuotes(market: Market, date: LocalDate): List<DailyQuote> = throttled {
+    private suspend fun fetchDailyQuotes(market: Market, date: LocalDate): List<DailyQuote> = throttleFor(market).request(background = true) {
         when (market) {
             Market.TWSE -> twse.dailyQuotes(date.format(TWSE_DATE)).let { r ->
                 val t = MarketDataParser.pickTable(r.tables, "代號", "收盤")
@@ -271,30 +327,59 @@ class StockRepository(
     }
 
     /**
-     * 增量更新日K：本地無資料時下載 [HISTORY_MONTHS] 個月，否則從最後一筆資料所在月份補到本月。
+     * 更新日K（[HISTORY_MONTHS] 個月）：
+     * 1. 從本月往回下載到本地最新一筆所在月份（本地無資料則下載全部月份），**新到舊**，第一個月下載完圖表即可顯示；
+     * 2. 若本地最早資料晚於目標起始月份（例如先前下載中斷，或由選股資料預先帶入），再由新到舊補齊更早的月份。
+     * @param foreground 使用者正在看的個股：優先於背景同步
      * @return 新寫入（或覆寫）的 K 棒數
      */
-    suspend fun refreshCandles(code: String, market: Market): Int {
-        val today = LocalDate.now(TAIPEI)
-        val thisMonth = YearMonth.from(today)
-        val latest = candleDao.latestEpochDay(code)?.let { LocalDate.ofEpochDay(it) }
-        val fromMonth = if (latest == null) thisMonth.minusMonths(HISTORY_MONTHS - 1L) else YearMonth.from(latest)
+    suspend fun refreshCandles(code: String, market: Market, foreground: Boolean = false): Int {
+        val throttle = throttleFor(market)
+        return if (foreground) throttle.withPriority { downloadCandles(code, market, background = false) }
+        else downloadCandles(code, market, background = true)
+    }
 
+    private suspend fun downloadCandles(code: String, market: Market, background: Boolean): Int {
+        val thisMonth = YearMonth.from(LocalDate.now(TAIPEI))
+        val targetStart = thisMonth.minusMonths(HISTORY_MONTHS - 1L)
         var written = 0
-        var month = fromMonth
-        while (!month.isAfter(thisMonth)) {
-            val candles = fetchMonth(code, market, month)
-            if (candles.isNotEmpty()) {
-                candleDao.upsertAll(candles.map { it.toEntity(code) })
-                written += candles.size
+        suspend fun fetchAndStore(month: YearMonth): Int {
+            val candles = fetchMonth(code, market, month, background)
+            if (candles.isNotEmpty()) candleDao.upsertAll(candles.map { it.toEntity(code) })
+            written += candles.size
+            return candles.size
+        }
+
+        val latest = candleDao.latestEpochDay(code)?.let { YearMonth.from(LocalDate.ofEpochDay(it)) }
+        CandlePlan.forward(thisMonth, latest, targetStart).forEach { fetchAndStore(it) }
+
+        if (code !in noOlderHistory) {
+            val earliest = candleDao.earliestEpochDay(code)?.let { YearMonth.from(LocalDate.ofEpochDay(it)) }
+            for (month in CandlePlan.backfill(earliest, targetStart)) {
+                if (fetchAndStore(month) == 0) {
+                    noOlderHistory += code
+                    break
+                }
             }
-            month = month.plusMonths(1)
         }
         return written
     }
 
-    private suspend fun fetchMonth(code: String, market: Market, month: YearMonth): List<Candle> =
-        throttled {
+    /**
+     * 本地沒有這檔的日K時，先用選股的全市場資料（最近 [MARKET_DAYS] 個交易日）帶入，圖表可立即顯示。
+     * @return 帶入的 K 棒數
+     */
+    suspend fun seedFromMarketData(code: String): Int {
+        if (candleDao.latestEpochDay(code) != null) return 0
+        val rows = marketDao.candlesFor(code)
+        if (rows.isNotEmpty()) {
+            candleDao.upsertAll(rows.map { CandleEntity(code, it.epochDay, it.open, it.high, it.low, it.close, it.volume) })
+        }
+        return rows.size
+    }
+
+    private suspend fun fetchMonth(code: String, market: Market, month: YearMonth, background: Boolean): List<Candle> =
+        throttleFor(market).request(background) {
             when (market) {
                 Market.TWSE -> {
                     val r = twse.stockDay(month.atDay(1).format(TWSE_DATE), code)
@@ -312,14 +397,14 @@ class StockRepository(
     private suspend fun probeStock(code: String): StockInfoEntity? {
         val month = YearMonth.now(TAIPEI)
         val twseResult = runCatching {
-            throttled { twse.stockDay(month.atDay(1).format(TWSE_DATE), code) }
+            twseThrottle.request(background = false) { twse.stockDay(month.atDay(1).format(TWSE_DATE), code) }
         }.getOrNull()
         if (twseResult?.stat.equals("OK", ignoreCase = true) && !twseResult?.data.isNullOrEmpty()) {
             val name = MarketDataParser.parseTwseName(twseResult?.title, code) ?: code
             return StockInfoEntity(code, name, Market.TWSE).also { infoDao.upsertAll(listOf(it)) }
         }
         val tpexResult = runCatching {
-            throttled { tpex.tradingStock(code, month.atDay(1).format(TPEX_DATE)) }
+            tpexThrottle.request(background = false) { tpex.tradingStock(code, month.atDay(1).format(TPEX_DATE)) }
         }.getOrNull()
         val tpexRows = tpexResult?.tables?.firstOrNull()?.data ?: tpexResult?.aaData
         if (!tpexRows.isNullOrEmpty()) {
@@ -328,15 +413,6 @@ class StockRepository(
         return null
     }
 
-    private suspend fun <T> throttled(block: suspend () -> T): T = throttle.withLock {
-        val wait = lastRequestAt + MIN_REQUEST_INTERVAL_MS - System.currentTimeMillis()
-        if (wait > 0) delay(wait)
-        try {
-            block()
-        } finally {
-            lastRequestAt = System.currentTimeMillis()
-        }
-    }
 
     private fun JsonObject.toInfo(codeKey: String, nameKey: String, market: Market): StockInfoEntity? {
         val code = get(codeKey)?.takeIf { it.isJsonPrimitive }?.asString?.trim() ?: return null
@@ -348,7 +424,9 @@ class StockRepository(
     companion object {
         val TAIPEI: ZoneId = ZoneId.of("Asia/Taipei")
         const val HISTORY_MONTHS = 12
-        const val MIN_REQUEST_INTERVAL_MS = 1_500L
+        /** 證交所約每 5 秒 3 個請求即可能被暫時封鎖 */
+        private const val TWSE_INTERVAL_MS = 1_700L
+        private const val TPEX_INTERVAL_MS = 600L
         private const val EX_RIGHT_CHUNK_MONTHS = 3L
         /** 選股保留的交易日數（首次同步約 2 × 65 個請求、約 3 分鐘） */
         const val MARKET_DAYS = 60

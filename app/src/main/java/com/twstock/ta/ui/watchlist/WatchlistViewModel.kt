@@ -118,7 +118,8 @@ class WatchlistViewModel(
                 val entity = repo.addToWatchlist(code)
                 query.value = ""
                 showMessage("已加入 ${entity.code} ${entity.name}，下載歷史資料中…")
-                repo.refreshCandles(entity.code, entity.market)
+                repo.seedFromMarketData(entity.code)
+                repo.refreshCandles(entity.code, entity.market, foreground = true)
             } catch (e: Exception) {
                 showMessage(e.message ?: "加入失敗")
             }
