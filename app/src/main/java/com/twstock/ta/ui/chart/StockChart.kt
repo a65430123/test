@@ -2,7 +2,9 @@ package com.twstock.ta.ui.chart
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -21,7 +23,10 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerInputScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextMeasurer
@@ -112,9 +117,10 @@ fun StockChart(
             .height(CHART_HEIGHT)
             .pointerInput(n) {
                 val axis = AXIS_WIDTH.toPx()
-                detectTransformGestures { _, pan, zoom, _ ->
-                    state.onTransform(n, size.width - axis, pan.x, zoom)
-                }
+                detectChartGestures(
+                    onPan = { dx -> state.onTransform(n, size.width - axis, dx, 1f) },
+                    onZoom = { zoom -> state.onTransform(n, size.width - axis, 0f, zoom) },
+                )
             }
             .pointerInput(n) {
                 val axis = AXIS_WIDTH.toPx()
@@ -153,6 +159,47 @@ fun StockChart(
         }
     }
 }
+
+/**
+ * 圖表手勢：單指先判斷方向，水平拖曳才平移圖表並吃掉事件；垂直拖曳不處理，
+ * 交給外層清單捲動（避免手指放在圖表上就無法捲動頁面）。雙指縮放。
+ */
+private suspend fun PointerInputScope.detectChartGestures(onPan: (Float) -> Unit, onZoom: (Float) -> Unit) {
+    awaitEachGesture {
+        awaitFirstDown(requireUnconsumed = false)
+        var mode = GestureMode.UNDECIDED
+        var totalX = 0f
+        var totalY = 0f
+        do {
+            val event = awaitPointerEvent()
+            val pressed = event.changes.filter { it.pressed }
+            if (pressed.size >= 2) {
+                mode = GestureMode.ZOOM
+                val zoom = event.calculateZoom()
+                if (zoom != 1f) onZoom(zoom)
+                event.changes.forEach { if (it.positionChanged()) it.consume() }
+            } else if (pressed.size == 1 && (mode == GestureMode.UNDECIDED || mode == GestureMode.PAN)) {
+                val change = pressed.first()
+                if (change.isConsumed) break // 外層已開始捲動
+                val delta = change.positionChange()
+                if (mode == GestureMode.UNDECIDED) {
+                    totalX += delta.x
+                    totalY += delta.y
+                    val slop = viewConfiguration.touchSlop
+                    if (abs(totalX) > slop || abs(totalY) > slop) {
+                        mode = if (abs(totalX) > abs(totalY)) GestureMode.PAN else GestureMode.VERTICAL
+                    }
+                }
+                if (mode == GestureMode.PAN) {
+                    onPan(delta.x)
+                    change.consume()
+                }
+            }
+        } while (event.changes.any { it.pressed })
+    }
+}
+
+private enum class GestureMode { UNDECIDED, PAN, VERTICAL, ZOOM }
 
 private val AXIS_WIDTH = 52.dp
 private val LEGEND_HEIGHT = 16.dp
