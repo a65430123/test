@@ -42,8 +42,8 @@ object SignalEngine {
             if (params.bollingerBreakoutActive) breakoutEvent(i, candles, bands, volumeMa, params)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER_BREAKOUT, desc)
             }
-            if (params.useKd) kdEvent(i, kd, params)?.let { (side, desc) ->
-                events += IndicatorEvent(i, date, side, SignalSource.KD, desc)
+            if (params.useKd) kdEvent(i, kd, params)?.let { (side, desc, type) ->
+                events += IndicatorEvent(i, date, side, SignalSource.KD, desc, type)
             }
             if (params.macdCrossActive) macdEvent(i, macd)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.MACD, desc)
@@ -128,20 +128,20 @@ object SignalEngine {
         return result.first to "%s（量 %.1f 倍）".format(result.second, ratio)
     }
 
-    private fun kdEvent(i: Int, kd: KdResult, p: IndicatorParams): Pair<SignalSide, String>? {
+    private fun kdEvent(i: Int, kd: KdResult, p: IndicatorParams): Triple<SignalSide, String, SignalType>? {
         val pk = kd.k[i - 1] ?: return null
         val pd = kd.d[i - 1] ?: return null
         val k = kd.k[i] ?: return null
         val d = kd.d[i] ?: return null
         return when {
             pk <= pd && k > d && pk <= p.kdOversold ->
-                SignalSide.BUY to "KD 低檔黃金交叉 (K=%.1f)".format(k)
+                Triple(SignalSide.BUY, "KD 低檔黃金交叉 (K=%.1f)".format(k), SignalType.KD_ZONE_CROSS)
             pk >= pd && k < d && pk >= p.kdOverbought ->
-                SignalSide.SELL to "KD 高檔死亡交叉 (K=%.1f)".format(k)
+                Triple(SignalSide.SELL, "KD 高檔死亡交叉 (K=%.1f)".format(k), SignalType.KD_ZONE_CROSS)
             p.kdMidCross && pk > p.kdOversold && pk < p.kdOverbought && pk <= pd && k > d ->
-                SignalSide.BUY to "KD 黃金交叉 (K=%.1f)".format(k)
+                Triple(SignalSide.BUY, "KD 黃金交叉 (K=%.1f)".format(k), SignalType.KD_MID_CROSS)
             p.kdMidCross && pk > p.kdOversold && pk < p.kdOverbought && pk >= pd && k < d ->
-                SignalSide.SELL to "KD 死亡交叉 (K=%.1f)".format(k)
+                Triple(SignalSide.SELL, "KD 死亡交叉 (K=%.1f)".format(k), SignalType.KD_MID_CROSS)
             else -> null
         }
     }

@@ -1,5 +1,7 @@
 package com.twstock.core.model
 
+import com.twstock.core.signal.SignalType
+
 /** 可被選為進出場訊號來源的指標。 */
 enum class SignalIndicator(val label: String) {
     BOLLINGER("布林通道"),
@@ -69,6 +71,17 @@ data class IndicatorParams(
             if (bollingerPullbackActive || bollingerBreakoutActive) add(SignalIndicator.BOLLINGER)
             if (useKd) add(SignalIndicator.KD)
             if (macdCrossActive || macdHistogramActive) add(SignalIndicator.MACD)
+        }
+
+    /** 目前會產生的訊號細分類型（依已選指標與細項開關）。 */
+    val enabledTypes: List<SignalType>
+        get() = buildList {
+            if (bollingerPullbackActive) add(SignalType.BOLLINGER_PULLBACK)
+            if (bollingerBreakoutActive) add(SignalType.BOLLINGER_BREAKOUT)
+            if (useKd) add(SignalType.KD_ZONE_CROSS)
+            if (useKd && kdMidCross) add(SignalType.KD_MID_CROSS)
+            if (macdCrossActive) add(SignalType.MACD_CROSS)
+            if (macdHistogramActive) add(SignalType.MACD_HISTOGRAM_TURN)
         }
 
     /** 實際需要的確認指標數：只選一個指標時為 1，多選時為 minConfirmations（不超過已選指標數）。 */

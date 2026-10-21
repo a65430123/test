@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.twstock.core.signal.SignalSide
+import com.twstock.core.signal.SignalType
 import com.twstock.ta.data.local.labelFor
 import com.twstock.ta.data.repository.StockRepository
 import com.twstock.ta.ui.AppViewModelProvider
@@ -80,7 +81,7 @@ fun ScreenerScreen(
     ) { padding ->
         LazyColumn(Modifier.padding(padding).fillMaxSize()) {
             item(key = "status") { Status(state) }
-            item(key = "filters") { Filters(state.filters, vm::updateFilters) }
+            item(key = "filters") { Filters(state.filters, state.typeCounts, vm::updateFilters) }
             item(key = "divider") { HorizontalDivider() }
             when {
                 state.latestDate == null && !state.scanning -> item(key = "empty") {
@@ -141,7 +142,11 @@ private fun Status(state: ScreenerUiState) {
 }
 
 @Composable
-private fun Filters(f: ScreenerFilters, update: ((ScreenerFilters) -> ScreenerFilters) -> Unit) {
+private fun Filters(
+    f: ScreenerFilters,
+    typeCounts: List<Pair<SignalType, Int>>,
+    update: ((ScreenerFilters) -> ScreenerFilters) -> Unit,
+) {
     Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(0.dp)) {
         ChipRow("方向") {
             SideFilter.entries.forEach { s ->
@@ -160,6 +165,19 @@ private fun Filters(f: ScreenerFilters, update: ((ScreenerFilters) -> ScreenerFi
                     onClick = { update { it.copy(minVolume = v) } },
                     label = { Text(if (v == 0L) "不限" else "≥%,d 張".format(v)) },
                 )
+            }
+        }
+        if (typeCounts.isNotEmpty()) {
+            ChipRow("類型") {
+                FilterChip(selected = f.types.isEmpty(), onClick = { update { it.copy(types = emptySet()) } }, label = { Text("全部") })
+                typeCounts.forEach { (type, count) ->
+                    val on = type in f.types
+                    FilterChip(
+                        selected = on,
+                        onClick = { update { it.copy(types = if (on) it.types - type else it.types + type) } },
+                        label = { Text("${type.label}（$count）") },
+                    )
+                }
             }
         }
     }

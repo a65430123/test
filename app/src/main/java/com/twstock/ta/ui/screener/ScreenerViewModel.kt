@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.twstock.core.ScreenHit
 import com.twstock.core.Screener
 import com.twstock.core.signal.SignalSide
+import com.twstock.core.signal.SignalType
 import com.twstock.ta.data.local.Market
 import com.twstock.ta.data.remote.MarketDataParser
 import com.twstock.ta.data.repository.StockRepository
@@ -35,6 +36,8 @@ data class ScreenerFilters(
     val market: MarketFilter = MarketFilter.ALL,
     /** 最低成交量（張）；0 表示不限 */
     val minVolume: Long = 500,
+    /** 訊號類型（多選，任一符合即顯示）；空集合表示不限 */
+    val types: Set<SignalType> = emptySet(),
 ) {
     companion object {
         val VOLUME_OPTIONS = listOf(0L, 500L, 1000L, 5000L)
@@ -65,6 +68,8 @@ data class ScreenerUiState(
     val filters: ScreenerFilters = ScreenerFilters(),
     val signalMode: String = "",
     val scanning: Boolean = true,
+    /** 目前訊號設定下可能出現的類型，與套用方向／市場／成交量篩選後各類型的檔數 */
+    val typeCounts: List<Pair<SignalType, Int>> = emptyList(),
 )
 
 private data class ScanResult(
@@ -72,6 +77,7 @@ private data class ScanResult(
     val scanned: Int,
     val items: List<ScreenItem>,
     val signalMode: String,
+    val enabledTypes: List<SignalType>,
 )
 
 private data class SyncState(val syncing: Boolean = false, val progress: Pair<Int, Int>? = null, val message: String? = null)
@@ -90,7 +96,9 @@ class ScreenerViewModel(
         combine(settingsRepo.settings, repo.observeMarketChanges().debounce(1_000)) { settings, _ -> settings }
             .mapLatest { settings ->
                 val latest = repo.latestMarketDay()
-                    ?: return@mapLatest ScanResult(null, 0, emptyList(), settings.params.describeSignalMode())
+                    ?: return@mapLatest ScanResult(
+                        null, 0, emptyList(), settings.params.describeSignalMode(), settings.params.enabledTypes,
+                    )
                 val series = repo.getMarketSeries()
                 val exRights = if (settings.adjustPrices) repo.getAllExRights() else emptyMap()
                 val info = repo.getStockInfoMap()
@@ -100,6 +108,7 @@ class ScreenerViewModel(
                     scanned = series.values.count { it.lastOrNull()?.date == latest },
                     items = hits.map { ScreenItem(it.code, info[it.code]?.name ?: it.code, info[it.code]?.market, it) },
                     signalMode = settings.params.describeSignalMode(),
+                    enabledTypes = settings.params.enabledTypes,
                 )
             }
             .flowOn(Dispatchers.Default)
@@ -107,6 +116,10 @@ class ScreenerViewModel(
 
     val state: StateFlow<ScreenerUiState> = combine(scan, filters, sync) { result, f, s ->
         val all = result?.items.orEmpty()
+        val enabledTypes = result?.enabledTypes.orEmpty()
+        // 已停用的類型不再參與篩選
+        val types = f.types.intersect(enabledTypes.toSet())
+        val base = all.filter { it.matches(f) }
         ScreenerUiState(
             syncing = s.syncing,
             progress = s.progress,
@@ -114,8 +127,9 @@ class ScreenerViewModel(
             latestDate = result?.latestDate,
             scanned = result?.scanned ?: 0,
             totalHits = all.size,
-            items = all.filter { it.matches(f) },
-            filters = f,
+            items = if (types.isEmpty()) base else base.filter { item -> item.hit.signal.types.any { it in types } },
+            filters = f.copy(types = types),
+            typeCounts = enabledTypes.map { type -> type to base.count { type in it.hit.signal.types } },
             signalMode = result?.signalMode.orEmpty(),
             scanning = result == null,
         )

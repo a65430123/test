@@ -9,6 +9,7 @@ import com.twstock.core.model.SignalIndicator
 import com.twstock.core.signal.SignalEngine
 import com.twstock.core.signal.SignalSide
 import com.twstock.core.signal.SignalSource
+import com.twstock.core.signal.SignalType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -35,6 +36,24 @@ class KdMacdRulesTest {
         assertEquals(listOf(SignalSide.BUY to "KD 黃金交叉 (K=55.0)", SignalSide.SELL to "KD 死亡交叉 (K=50.0)"),
             e.map { it.side to it.description })
         assertTrue(e.all { it.source == SignalSource.KD })
+    }
+
+    @Test
+    fun kd_typesDistinguishZoneAndMidCrosses() {
+        assertEquals(listOf(SignalType.KD_MID_CROSS, SignalType.KD_MID_CROSS),
+            kdEvents(listOf(45.0, 55.0, 60.0, 50.0), listOf(50.0, 50.0, 55.0, 55.0)).map { it.type })
+        assertEquals(listOf(SignalType.KD_ZONE_CROSS), kdEvents(listOf(15.0, 25.0), listOf(20.0, 20.0)).map { it.type })
+        assertEquals(listOf(SignalType.MACD_HISTOGRAM_TURN), histEvents(listOf(null, 0.5, 2.0, 1.6)).map { it.type })
+    }
+
+    @Test
+    fun enabledTypes_followSelection() {
+        assertEquals(SignalType.entries, IndicatorParams().enabledTypes)
+        assertEquals(
+            listOf(SignalType.BOLLINGER_PULLBACK, SignalType.KD_ZONE_CROSS, SignalType.MACD_CROSS),
+            IndicatorParams(useBollingerBreakout = false, kdMidCross = false, macdHistogramTurn = false).enabledTypes,
+        )
+        assertEquals(listOf(SignalType.KD_ZONE_CROSS, SignalType.KD_MID_CROSS), IndicatorParams(bollingerSignals = false, useMacd = false).enabledTypes)
     }
 
     @Test
