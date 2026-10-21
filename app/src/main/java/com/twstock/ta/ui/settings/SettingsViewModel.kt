@@ -3,6 +3,7 @@ package com.twstock.ta.ui.settings
 import android.app.Application
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.twstock.core.model.ChipParty
 import com.twstock.core.model.IndicatorParams
 import com.twstock.ta.data.settings.SettingsRepository
 import com.twstock.ta.worker.SignalCheckWorker
@@ -37,6 +38,11 @@ data class SettingsForm(
     val useMacd: Boolean = true,
     val macdCross: Boolean = true,
     val macdHistogramTurn: Boolean = true,
+    val useChips: Boolean = false,
+    val chipParty: ChipParty = ChipParty.TOTAL,
+    val chipStreakDays: String = "",
+    val chipMinNet: String = "",
+    val finMindToken: String = "",
     val minConfirmations: String = "",
     val confirmWindow: String = "",
     val notificationsEnabled: Boolean = true,
@@ -66,13 +72,17 @@ data class SettingsForm(
             useMacd = useMacd,
             macdCross = macdCross,
             macdHistogramTurn = macdHistogramTurn,
+            useChips = useChips,
+            chipParty = chipParty,
+            chipStreakDays = chipStreakDays.trim().toInt(),
+            chipMinNet = chipMinNet.trim().toInt(),
             minConfirmations = minConfirmations.trim().toInt(),
             confirmWindow = confirmWindow.trim().toInt(),
         )
     }.getOrNull()
 
     companion object {
-        fun from(p: IndicatorParams, notify: Boolean, adjust: Boolean) = SettingsForm(
+        fun from(p: IndicatorParams, notify: Boolean, adjust: Boolean, token: String) = SettingsForm(
             bbPeriod = p.bbPeriod.toString(),
             bbMultiplier = p.bbMultiplier.toString(),
             bbBreakoutVolumeRatio = p.bbBreakoutVolumeRatio.toString(),
@@ -95,6 +105,11 @@ data class SettingsForm(
             useMacd = p.useMacd,
             macdCross = p.macdCross,
             macdHistogramTurn = p.macdHistogramTurn,
+            useChips = p.useChips,
+            chipParty = p.chipParty,
+            chipStreakDays = p.chipStreakDays.toString(),
+            chipMinNet = p.chipMinNet.toString(),
+            finMindToken = token,
             minConfirmations = p.minConfirmations.toString(),
             confirmWindow = p.confirmWindow.toString(),
             notificationsEnabled = notify,
@@ -121,7 +136,7 @@ class SettingsViewModel(
     init {
         viewModelScope.launch {
             val s = repo.settings.first()
-            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled, s.adjustPrices))
+            _state.value = SettingsUiState(loaded = true, form = SettingsForm.from(s.params, s.notificationsEnabled, s.adjustPrices, s.finMindToken))
         }
     }
 
@@ -132,7 +147,9 @@ class SettingsViewModel(
     fun resetDefaults() {
         _state.update {
             it.copy(
-                form = SettingsForm.from(IndicatorParams(), it.form.notificationsEnabled, it.form.adjustPrices),
+                form = SettingsForm.from(
+                    IndicatorParams(), it.form.notificationsEnabled, it.form.adjustPrices, it.form.finMindToken,
+                ),
                 errors = emptyList(),
             )
         }
@@ -150,6 +167,7 @@ class SettingsViewModel(
             repo.saveParams(params!!)
             repo.setNotificationsEnabled(form.notificationsEnabled)
             repo.setAdjustPrices(form.adjustPrices)
+            repo.setFinMindToken(form.finMindToken)
             _state.update { it.copy(message = "已儲存設定") }
         }
     }

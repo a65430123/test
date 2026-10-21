@@ -75,6 +75,10 @@ interface CandleDao {
 
     @Query("DELETE FROM candles WHERE code = :code")
     suspend fun deleteFor(code: String)
+
+    /** 最近 n 個有 K 棒資料的交易日（新到舊）。 */
+    @Query("SELECT DISTINCT epochDay FROM candles ORDER BY epochDay DESC LIMIT :n")
+    suspend fun recentTradingDays(n: Int): List<Long>
 }
 
 @Dao
@@ -94,4 +98,44 @@ interface ExRightDao {
 
     @Query("SELECT MAX(epochDay) FROM ex_rights WHERE market = :market")
     suspend fun latestEpochDay(market: Market): Long?
+}
+
+@Dao
+interface ChipDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertInstitutional(items: List<InstitutionalEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertMargin(items: List<MarginEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun markSynced(item: ChipSyncEntity)
+
+    @Query("SELECT epochDay FROM chip_sync WHERE market = :market AND dataset = :dataset")
+    suspend fun syncedDays(market: Market, dataset: String): List<Long>
+
+    @Query("SELECT * FROM institutional WHERE code = :code ORDER BY epochDay")
+    suspend fun getInstitutional(code: String): List<InstitutionalEntity>
+
+    @Query("SELECT * FROM margin WHERE code = :code ORDER BY epochDay")
+    suspend fun getMargin(code: String): List<MarginEntity>
+
+    @Query("SELECT * FROM institutional WHERE code = :code ORDER BY epochDay")
+    fun observeInstitutional(code: String): Flow<List<InstitutionalEntity>>
+
+    @Query("SELECT * FROM margin WHERE code = :code ORDER BY epochDay")
+    fun observeMargin(code: String): Flow<List<MarginEntity>>
+
+    /** 資料表變動通知（同步完成後觸發重新計算）。 */
+    @Query("SELECT COUNT(*) FROM chip_sync")
+    fun observeSyncCount(): Flow<Int>
+
+    @Query("DELETE FROM institutional WHERE epochDay < :epochDay")
+    suspend fun pruneInstitutional(epochDay: Long)
+
+    @Query("DELETE FROM margin WHERE epochDay < :epochDay")
+    suspend fun pruneMargin(epochDay: Long)
+
+    @Query("DELETE FROM chip_sync WHERE epochDay < :epochDay")
+    suspend fun pruneSync(epochDay: Long)
 }

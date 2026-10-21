@@ -7,7 +7,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.doublePreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.twstock.core.model.ChipParty
 import com.twstock.core.model.IndicatorParams
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -19,6 +21,8 @@ data class AppSettings(
     val notificationsEnabled: Boolean = true,
     /** 以除權息還原價計算指標與繪圖 */
     val adjustPrices: Boolean = true,
+    /** FinMind API token（分點券商資料用）；空字串表示未設定 */
+    val finMindToken: String = "",
 )
 
 class SettingsRepository(context: Context) {
@@ -50,11 +54,16 @@ class SettingsRepository(context: Context) {
                 useMacd = p[USE_MACD] ?: d.useMacd,
                 macdCross = p[MACD_CROSS] ?: d.macdCross,
                 macdHistogramTurn = p[MACD_HIST_TURN] ?: d.macdHistogramTurn,
+                useChips = p[USE_CHIPS] ?: d.useChips,
+                chipParty = p[CHIP_PARTY]?.let { name -> ChipParty.entries.firstOrNull { it.name == name } } ?: d.chipParty,
+                chipStreakDays = p[CHIP_STREAK] ?: d.chipStreakDays,
+                chipMinNet = p[CHIP_MIN_NET] ?: d.chipMinNet,
                 minConfirmations = p[MIN_CONFIRM] ?: d.minConfirmations,
                 confirmWindow = p[CONFIRM_WINDOW] ?: d.confirmWindow,
             ),
             notificationsEnabled = p[NOTIFY] ?: true,
             adjustPrices = p[ADJUST] ?: true,
+            finMindToken = p[FINMIND_TOKEN] ?: "",
         )
     }
 
@@ -83,6 +92,10 @@ class SettingsRepository(context: Context) {
             p[USE_MACD] = params.useMacd
             p[MACD_CROSS] = params.macdCross
             p[MACD_HIST_TURN] = params.macdHistogramTurn
+            p[USE_CHIPS] = params.useChips
+            p[CHIP_PARTY] = params.chipParty.name
+            p[CHIP_STREAK] = params.chipStreakDays
+            p[CHIP_MIN_NET] = params.chipMinNet
             p[MIN_CONFIRM] = params.minConfirmations
             p[CONFIRM_WINDOW] = params.confirmWindow
         }
@@ -94,6 +107,10 @@ class SettingsRepository(context: Context) {
 
     suspend fun setAdjustPrices(enabled: Boolean) {
         store.edit { it[ADJUST] = enabled }
+    }
+
+    suspend fun setFinMindToken(token: String) {
+        store.edit { it[FINMIND_TOKEN] = token.trim() }
     }
 
     private companion object {
@@ -119,6 +136,11 @@ class SettingsRepository(context: Context) {
         val USE_MACD = booleanPreferencesKey("use_macd")
         val MACD_CROSS = booleanPreferencesKey("macd_cross")
         val MACD_HIST_TURN = booleanPreferencesKey("macd_hist_turn")
+        val USE_CHIPS = booleanPreferencesKey("use_chips")
+        val CHIP_PARTY = stringPreferencesKey("chip_party")
+        val CHIP_STREAK = intPreferencesKey("chip_streak")
+        val CHIP_MIN_NET = intPreferencesKey("chip_min_net")
+        val FINMIND_TOKEN = stringPreferencesKey("finmind_token")
         val MIN_CONFIRM = intPreferencesKey("min_confirm")
         val CONFIRM_WINDOW = intPreferencesKey("confirm_window")
         val NOTIFY = booleanPreferencesKey("notify")

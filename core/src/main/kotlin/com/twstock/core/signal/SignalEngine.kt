@@ -4,6 +4,7 @@ import com.twstock.core.indicator.BollingerBands
 import com.twstock.core.indicator.KdResult
 import com.twstock.core.indicator.MacdResult
 import com.twstock.core.model.Candle
+import com.twstock.core.model.ChipDay
 import com.twstock.core.model.IndicatorParams
 
 /**
@@ -11,6 +12,8 @@ import com.twstock.core.model.IndicatorParams
  * - 布林收回：前日收盤跌破下軌、今日收回下軌之上 → 買；前日收盤突破上軌、今日跌回上軌之下 → 賣。
  * - 布林突破（超買／超賣）：收盤由上軌之下突破上軌 → 賣；收盤由下軌之上跌破下軌 → 買。
  *   可要求量增：當日量 ≥ bbBreakoutVolumeRatio × 前一日的短期成交量均線。
+ * - 籌碼：所選法人（預設三大法人合計）每日買超 > chipMinNet 張連續 chipStreakDays 日 → 買；
+ *   每日賣超連續 chipStreakDays 日 → 賣。只在連續天數「剛好達到」門檻當日發出；缺資料的日子中斷連續。
  * - KD：K 由下往上穿越 D（黃金交叉）且前日 K 位於超賣區 → 買；K 由上往下穿越 D（死亡交叉）且前日 K 位於超買區 → 賣。
  * - KD 中檔交叉（可關閉）：前日 K 介於超賣與超買門檻之間的黃金交叉 → 買、死亡交叉 → 賣。
  * - MACD 交叉：DIF 由下往上穿越訊號線（柱狀體翻正）→ 買；由上往下穿越（柱狀體翻負）→ 賣。
@@ -31,10 +34,20 @@ object SignalEngine {
         macd: MacdResult,
         params: IndicatorParams,
         volumeMa: List<Double?> = List(candles.size) { null },
+        chips: List<ChipDay?> = List(candles.size) { null },
     ): List<IndicatorEvent> {
         val events = mutableListOf<IndicatorEvent>()
+        val (buyStreak, sellStreak) = chipStreaks(chips, params)
         for (i in 1 until candles.size) {
             val date = candles[i].date
+            if (params.useChips) {
+                val who = params.chipParty.label
+                if (buyStreak[i] == params.chipStreakDays) {
+                    events += IndicatorEvent(i, date, SignalSide.BUY, SignalSource.CHIPS, "${who}連續買超 ${params.chipStreakDays} 日")
+                } else if (sellStreak[i] == params.chipStreakDays) {
+                    events += IndicatorEvent(i, date, SignalSide.SELL, SignalSource.CHIPS, "${who}連續賣超 ${params.chipStreakDays} 日")
+                }
+            }
             if (params.bollingerPullbackActive) bollingerEvent(i, candles, bands)?.let { (side, desc) ->
                 events += IndicatorEvent(i, date, side, SignalSource.BOLLINGER, desc)
             }
@@ -125,6 +138,20 @@ object SignalEngine {
         val ratio = c[i].volume / avg
         if (ratio < p.bbBreakoutVolumeRatio) return null
         return result.first to "%s（量 %.1f 倍）".format(result.second, ratio)
+    }
+
+    /** 每日截至當日的連續買超／賣超天數；缺資料或未達門檻即歸零。 */
+    private fun chipStreaks(chips: List<ChipDay?>, p: IndicatorParams): Pair<IntArray, IntArray> {
+        val buy = IntArray(chips.size)
+        val sell = IntArray(chips.size)
+        for (i in chips.indices) {
+            val net = chips[i]?.net(p.chipParty)
+            val prevBuy = if (i > 0) buy[i - 1] else 0
+            val prevSell = if (i > 0) sell[i - 1] else 0
+            buy[i] = if (net != null && net > p.chipMinNet) prevBuy + 1 else 0
+            sell[i] = if (net != null && net < -p.chipMinNet) prevSell + 1 else 0
+        }
+        return buy to sell
     }
 
     private fun kdEvent(i: Int, kd: KdResult, p: IndicatorParams): Pair<SignalSide, String>? {

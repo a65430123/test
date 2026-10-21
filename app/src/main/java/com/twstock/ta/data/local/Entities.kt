@@ -57,6 +57,36 @@ data class ExRightEntity(
     fun toModel() = ExRightEvent(LocalDate.ofEpochDay(epochDay), closeBefore, referencePrice)
 }
 
+/** 三大法人買賣超（張），全市場儲存，僅保留最近 [com.twstock.ta.data.repository.StockRepository.CHIP_DAYS] 個交易日。 */
+@Entity(tableName = "institutional", primaryKeys = ["code", "epochDay"])
+data class InstitutionalEntity(
+    val code: String,
+    val epochDay: Long,
+    val foreignNet: Long,
+    val trustNet: Long,
+    val dealerNet: Long,
+    val totalNet: Long,
+)
+
+/** 融資融券餘額與增減（張）。 */
+@Entity(tableName = "margin", primaryKeys = ["code", "epochDay"])
+data class MarginEntity(
+    val code: String,
+    val epochDay: Long,
+    val marginBalance: Long?,
+    val marginChange: Long?,
+    val shortBalance: Long?,
+    val shortChange: Long?,
+)
+
+/** 已下載過的籌碼資料日（市場 × 資料集 × 日期），避免重複請求。 */
+@Entity(tableName = "chip_sync", primaryKeys = ["market", "dataset", "epochDay"])
+data class ChipSyncEntity(
+    val market: Market,
+    val dataset: String,
+    val epochDay: Long,
+)
+
 /** 自選股清單列：自選股 + 最新兩日收盤價。 */
 data class WatchlistRow(
     val code: String,

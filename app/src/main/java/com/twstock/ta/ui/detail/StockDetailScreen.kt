@@ -26,11 +26,17 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -55,9 +61,17 @@ fun StockDetailScreen(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val chart by vm.chart.collectAsStateWithLifecycle()
+    val broker by vm.broker.collectAsStateWithLifecycle()
+    var tab by rememberSaveable { mutableIntStateOf(TAB_SIGNALS) }
     val chartState = rememberChartState()
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
+
+    // 第一次切到籌碼分頁時，自動載入最近一個交易日的分點資料
+    val latestDate = chart?.analysis?.candles?.lastOrNull()?.date
+    LaunchedEffect(tab, latestDate) {
+        if (tab == TAB_CHIPS && latestDate != null && broker == BrokerState.Idle) vm.loadBrokers(latestDate)
+    }
 
     Scaffold(
         topBar = {
@@ -148,25 +162,34 @@ fun StockDetailScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp),
                         )
-                        HorizontalDivider(Modifier.padding(top = 4.dp))
-                        Text(
-                            "進出場訊號（共 ${data.analysis.signals.size} 筆）",
-                            style = MaterialTheme.typography.titleSmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                        )
+                        TabRow(selectedTabIndex = tab, modifier = Modifier.padding(top = 4.dp)) {
+                            Tab(
+                                selected = tab == TAB_SIGNALS,
+                                onClick = { tab = TAB_SIGNALS },
+                                text = { Text("進出場訊號（${data.analysis.signals.size}）") },
+                            )
+                            Tab(selected = tab == TAB_CHIPS, onClick = { tab = TAB_CHIPS }, text = { Text("籌碼") })
+                        }
                     }
                 }
-                items(data.analysis.signals.asReversed(), key = { "${it.index}-${it.side}" }) { signal ->
-                    SignalRow(signal, data.adjusted, onClick = {
-                        chartState.focus(signal.index, data.analysis.candles.size)
-                        scope.launch { listState.animateScrollToItem(0) }
-                    })
+                if (tab == TAB_SIGNALS) {
+                    items(data.analysis.signals.asReversed(), key = { "${it.index}-${it.side}" }) { signal ->
+                        SignalRow(signal, data.adjusted, onClick = {
+                            chartState.focus(signal.index, data.analysis.candles.size)
+                            scope.launch { listState.animateScrollToItem(0) }
+                        })
+                    }
+                } else {
+                    chipItems(data.chips, data.params, broker, onSelectDate = vm::loadBrokers)
                 }
             }
             }
         }
     }
 }
+
+private const val TAB_SIGNALS = 0
+private const val TAB_CHIPS = 1
 
 /** 選擇以哪些指標判斷進出場訊號：單選＝只看該指標，多選時可選確認數。 */
 @Composable

@@ -1,6 +1,6 @@
 # 台股技術分析 App（Android）
 
-台股（上市＋上櫃）日 K 技術分析：自選股、K 線疊加布林通道、副圖成交量 / KD / MACD、自動判斷進出場訊號並推播。
+台股（上市＋上櫃）日 K 技術分析：自選股、K 線疊加布林通道、副圖成交量 / KD / MACD、每日籌碼（三大法人、融資融券、分點券商）、自動判斷進出場訊號並推播。
 
 - Kotlin + Jetpack Compose（Material 3）
 - MVVM：`ViewModel` + `StateFlow`，手動 DI（`AppContainer`）
@@ -63,16 +63,25 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 | KD 中檔（可關閉） | 前日 K 介於 20–80 的黃金交叉 | 前日 K 介於 20–80 的死亡交叉 |
 | MACD 交叉 | DIF 上穿訊號線（OSC 翻正） | DIF 下穿訊號線（OSC 翻負） |
 | MACD 柱狀轉折 | 負柱狀：前一根是本段最低點，今日第一根往上 | 正柱狀：前一根是本段最高點，今日第一根往下 |
+| 籌碼（預設不納入） | 所選法人每日買超 > 最低張數，連續達 N 日（預設三大法人、3 日、0 張） | 每日賣超連續達 N 日 |
 
 布林「突破」與「收回」都是逆勢（超買／超賣）訊號：突破／跌破當天先發出，收回當天再發出一次，兩者分開計算、可各自開關。突破訊號可設定「量增倍數」：當日量 ≥ 倍數 × 前一日 5 日均量才成立（預設 0 = 不檢查）。
 
 **訊號來源（可單選或多選）**：個股頁上方的「訊號來源」可選布林通道、KD、MACD（設定頁各指標的「納入訊號判斷」相同）。此設定為全域，自選股清單與推播一併套用。
 
 - **只選一個指標**：只看該指標，它的每個訊號都會發出（例如「只看 KD」＝每次 KD 低檔黃金交叉／高檔死亡交叉）。布林通道包含哪些規則（收回、突破）由設定頁決定。
-- **多選**：在最近 `確認視窗`（預設 3）個交易日內，需有至少 `確認數`（預設 2）個不同規則給出同方向訊號；布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個規則（KD 高低檔與中檔交叉同屬 KD 規則），「任一」＝確認數 1。確認數超過已啟用的規則數時以規則數計。
+- **多選**：在最近 `確認視窗`（預設 3）個交易日內，需有至少 `確認數`（預設 2）個不同規則給出同方向訊號；布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折、籌碼各算一個規則（KD 高低檔與中檔交叉同屬 KD 規則），「任一」＝確認數 1。確認數超過已啟用的規則數時以規則數計。
 - 同方向訊號產生後，於確認視窗內不重複發出。
 
 **推播**：WorkManager 每日台北時間 14:30 後執行，更新所有自選股；若「最新一根 K 棒」產生訊號且該日尚未推播過，就發通知（點通知直接開該股圖表）。設定頁可「立即檢查」。
+
+## 每日籌碼
+
+個股頁「籌碼」分頁：
+
+- **三大法人買賣超、融資融券**：最近 20 個交易日（張），點選日期查看當日分點券商。來自證交所／櫃買中心的全市場日報，每個交易日每個市場各一個請求，已下載的日期不再請求；首次同步約 1 分鐘。
+- **分點券商進出**：當日買超、賣超前 10 名分點。資料來自 FinMind（`TaiwanStockTradingDailyReport`），需在設定頁輸入自己的 API token（可能需付費方案）；未設定時不顯示。證交所／櫃買中心的券商買賣日報需輸入驗證碼，無法由 App 自動下載。
+- **籌碼訊號**：在訊號來源選「籌碼」後，法人連續買（賣）超達門檻當天發出訊號；缺資料的日子會中斷連續天數。
 
 ## 資料來源
 
@@ -82,6 +91,11 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 | 上櫃日 K（每次一個月） | `https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=XXXX&date=yyyy/MM/dd&response=json` |
 | 上市除權息 | `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=yyyyMMdd&endDate=yyyyMMdd&response=json` |
 | 上櫃除權息 | `https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ?startDate=yyyy/MM/dd&endDate=yyyy/MM/dd&response=json` |
+| 上市三大法人 | `https://www.twse.com.tw/rwd/zh/fund/T86?date=yyyyMMdd&selectType=ALLBUT0999&response=json` |
+| 上市融資融券 | `https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?date=yyyyMMdd&selectType=ALL&response=json` |
+| 上櫃三大法人 | `https://www.tpex.org.tw/www/zh-tw/insti/dailyTrade?type=Daily&sect=EW&date=yyyy/MM/dd&response=json` |
+| 上櫃融資融券 | `https://www.tpex.org.tw/www/zh-tw/margin/balance?date=yyyy/MM/dd&response=json` |
+| 分點券商 | `https://api.finmindtrade.com/api/v4/data?dataset=TaiwanStockTradingDailyReport&data_id=XXXX&start_date=yyyy-MM-dd&end_date=yyyy-MM-dd`（Bearer token） |
 | 上市股票清單 | `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL` |
 | 上櫃股票清單 | `https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes` |
 
@@ -103,6 +117,7 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 ## 已知限制 / 後續可做
 
 - 還原價未處理減資、分割等非除權息的股本變動。
+- 籌碼端點與欄位依官方網站現行格式撰寫（以欄位名稱定位），尚未在真實網路上驗證；FinMind 分點資料的欄位亦同。
 - 股票清單只在本地為空時下載一次。
 - 端點格式為政府網站公開資料，若官方改版需調整 `MarketDataParser` / DTO。
 - 部分舊 Android 裝置可能缺少 TWCA 根憑證，連線證交所會出現 SSL 錯誤，必要時可加入 `network_security_config` 信任該 CA。

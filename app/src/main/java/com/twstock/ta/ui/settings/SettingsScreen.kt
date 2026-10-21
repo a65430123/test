@@ -1,5 +1,6 @@
 package com.twstock.ta.ui.settings
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,6 +15,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -32,9 +34,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.twstock.core.model.ChipParty
 import com.twstock.ta.ui.AppViewModelProvider
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -146,6 +150,38 @@ fun SettingsScreen(
                 }
             }
 
+            Section("籌碼") {
+                SwitchRow("納入訊號判斷（法人連續買超買、連續賣超賣）", f.useChips) { v -> vm.update { it.copy(useChips = v) } }
+                Row(
+                    Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("參考法人", style = MaterialTheme.typography.labelMedium)
+                    ChipParty.entries.forEach { party ->
+                        FilterChip(
+                            selected = f.chipParty == party,
+                            onClick = { vm.update { it.copy(chipParty = party) } },
+                            label = { Text(party.label) },
+                        )
+                    }
+                }
+                FieldRow {
+                    NumberField("連續天數", f.chipStreakDays, Modifier.weight(1f)) { v -> vm.update { it.copy(chipStreakDays = v) } }
+                    NumberField("每日最低張數", f.chipMinNet, Modifier.weight(1f)) { v -> vm.update { it.copy(chipMinNet = v) } }
+                }
+                Hint("每日買（賣）超需大於最低張數才計入連續天數；0 表示只要有買（賣）超。達到連續天數的當天發出訊號。")
+                OutlinedTextField(
+                    value = f.finMindToken,
+                    onValueChange = { v -> vm.update { it.copy(finMindToken = v) } },
+                    label = { Text("FinMind API token（分點券商用）") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Hint("分點券商進出取自 FinMind（finmindtrade.com），需自行註冊取得 token，可能需付費方案。token 只存在本機。")
+            }
+
             Section("訊號確認") {
                 f.toParams()?.let { p ->
                     Text("目前：${p.describeSignalMode()}", style = MaterialTheme.typography.bodyMedium)
@@ -160,7 +196,7 @@ fun SettingsScreen(
                 }
                 Hint(
                     "只選一個指標時，該指標的每個訊號都會發出。多選時，需在視窗天數內有指定數量的不同規則" +
-                        "（布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
+                        "（布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折、籌碼各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
                 )
                 SwitchRow("收盤後推播通知", f.notificationsEnabled) { v -> vm.update { it.copy(notificationsEnabled = v) } }
             }

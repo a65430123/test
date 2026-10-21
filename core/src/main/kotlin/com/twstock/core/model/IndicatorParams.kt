@@ -5,6 +5,7 @@ enum class SignalIndicator(val label: String) {
     BOLLINGER("布林通道"),
     KD("KD"),
     MACD("MACD"),
+    CHIPS("籌碼"),
 }
 
 /**
@@ -50,9 +51,15 @@ data class IndicatorParams(
     val macdCross: Boolean = true,
     /** MACD 柱狀轉折訊號（正柱狀由最高點第一根往下賣、負柱狀由最低點第一根往上買） */
     val macdHistogramTurn: Boolean = true,
+    /** 籌碼是否作為訊號來源：法人連續買超 chipStreakDays 日 → 買，連續賣超 → 賣。 */
+    val useChips: Boolean = false,
+    val chipParty: ChipParty = ChipParty.TOTAL,
+    val chipStreakDays: Int = 3,
+    /** 每日買（賣）超至少幾張才計入連續天數；0 表示只要大於 0。 */
+    val chipMinNet: Int = 0,
     /**
      * 多選指標時，同方向需有幾個不同規則確認才產生進出場訊號
-     * （布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）。只選一個指標時不適用。
+     * （布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折、籌碼各算一個）。只選一個指標時不適用。
      */
     val minConfirmations: Int = 2,
     /** 確認視窗（交易日）：在此天數內出現的同方向指標事件可互相確認。 */
@@ -69,12 +76,14 @@ data class IndicatorParams(
             if (bollingerPullbackActive || bollingerBreakoutActive) add(SignalIndicator.BOLLINGER)
             if (useKd) add(SignalIndicator.KD)
             if (macdCrossActive || macdHistogramActive) add(SignalIndicator.MACD)
+            if (useChips) add(SignalIndicator.CHIPS)
         }
 
     /** 實際啟用的訊號規則數（布林收回、布林突破、MACD 交叉、MACD 柱狀轉折分開計算）。 */
     val enabledRuleCount: Int
-        get() = listOf(bollingerPullbackActive, bollingerBreakoutActive, useKd, macdCrossActive, macdHistogramActive)
-            .count { it }
+        get() = listOf(
+            bollingerPullbackActive, bollingerBreakoutActive, useKd, macdCrossActive, macdHistogramActive, useChips,
+        ).count { it }
 
     /** 實際需要的確認數：只選一個指標時為 1，多選時為 minConfirmations（不超過啟用的規則數）。 */
     val requiredConfirmations: Int
@@ -106,6 +115,7 @@ data class IndicatorParams(
             } else {
                 copy(useMacd = selected)
             }
+        SignalIndicator.CHIPS -> copy(useChips = selected)
     }
 
     /** 回傳錯誤訊息清單；空清單代表參數合法。 */
@@ -123,7 +133,9 @@ data class IndicatorParams(
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
         if (selectedIndicators.isEmpty()) add("至少需選擇一個指標作為訊號來源")
-        if (minConfirmations !in 1..5) add("確認指標數需介於 1–5")
+        if (chipStreakDays !in 1..20) add("籌碼連續天數需介於 1–20")
+        if (chipMinNet !in 0..1_000_000) add("籌碼每日最低買賣超張數需介於 0–1,000,000")
+        if (minConfirmations !in 1..6) add("確認指標數需介於 1–6")
         if (confirmWindow !in 1..20) add("確認視窗需介於 1–20 日")
     }
 }

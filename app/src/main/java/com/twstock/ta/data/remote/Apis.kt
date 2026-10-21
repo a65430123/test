@@ -2,6 +2,7 @@ package com.twstock.ta.data.remote
 
 import com.google.gson.JsonObject
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Query
 
 interface TwseApi {
@@ -10,6 +11,22 @@ interface TwseApi {
     suspend fun stockDay(
         @Query("date") date: String,
         @Query("stockNo") stockNo: String,
+        @Query("response") response: String = "json",
+    ): TwseTableResponse
+
+    /** 上市三大法人買賣超日報（全市場，單位：股），日期格式 yyyyMMdd */
+    @GET("rwd/zh/fund/T86")
+    suspend fun institutional(
+        @Query("date") date: String,
+        @Query("selectType") selectType: String = "ALLBUT0999",
+        @Query("response") response: String = "json",
+    ): TwseTableResponse
+
+    /** 上市融資融券餘額（全市場，單位：張），日期格式 yyyyMMdd */
+    @GET("rwd/zh/marginTrading/MI_MARGN")
+    suspend fun margin(
+        @Query("date") date: String,
+        @Query("selectType") selectType: String = "ALL",
         @Query("response") response: String = "json",
     ): TwseTableResponse
 
@@ -31,6 +48,22 @@ interface TpexApi {
     @GET("www/zh-tw/afterTrading/tradingStock")
     suspend fun tradingStock(
         @Query("code") code: String,
+        @Query("date") date: String,
+        @Query("response") response: String = "json",
+    ): TpexTableResponse
+
+    /** 上櫃三大法人買賣明細（全市場，單位：股），日期格式 yyyy/MM/dd */
+    @GET("www/zh-tw/insti/dailyTrade")
+    suspend fun institutional(
+        @Query("date") date: String,
+        @Query("type") type: String = "Daily",
+        @Query("sect") sect: String = "EW",
+        @Query("response") response: String = "json",
+    ): TpexTableResponse
+
+    /** 上櫃融資融券餘額（全市場，單位：張），日期格式 yyyy/MM/dd */
+    @GET("www/zh-tw/margin/balance")
+    suspend fun margin(
         @Query("date") date: String,
         @Query("response") response: String = "json",
     ): TpexTableResponse
@@ -59,5 +92,23 @@ interface TwseOpenApi {
 
     companion object {
         const val BASE_URL = "https://openapi.twse.com.tw/"
+    }
+}
+
+/** FinMind 開放資料 API；分點券商資料需使用者自行申請 token。 */
+interface FinMindApi {
+    /** 個股分點券商買賣日報（每家券商每個價位一列，單位：股） */
+    @GET("api/v4/data")
+    suspend fun data(
+        @Header("Authorization") authorization: String,
+        @Query("dataset") dataset: String,
+        @Query("data_id") dataId: String,
+        @Query("start_date") startDate: String,
+        @Query("end_date") endDate: String,
+    ): FinMindResponse
+
+    companion object {
+        const val BASE_URL = "https://api.finmindtrade.com/"
+        const val BROKER_DATASET = "TaiwanStockTradingDailyReport"
     }
 }
