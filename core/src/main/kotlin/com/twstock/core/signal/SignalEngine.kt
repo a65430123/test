@@ -17,9 +17,10 @@ import com.twstock.core.model.IndicatorParams
  * - MACD 柱狀轉折：柱狀為正且前一根是本段正柱狀的最高點、今日第一根往下 → 賣；
  *   柱狀為負且前一根是本段負柱狀的最低點、今日第一根往上 → 買。
  *
- * 只選一個指標作為訊號來源時，該指標的每個事件都是訊號（不需確認）。
+ * 只選一個指標作為訊號來源時，該指標任一類型的事件都是訊號（不需確認）。
  * 多選時的確認機制：當日有事件觸發，且在最近 confirmWindow 個交易日內（含當日）
- * 有至少 minConfirmations 個「不同規則」出現同方向事件，即產生訊號。
+ * 有至少 minConfirmations 個「不同指標」出現同方向事件，即產生訊號；
+ * 同一指標的多種類型（例如布林收回與布林突破）只算一個指標。
  * 同方向訊號產生後，於 confirmWindow 日內不重複發出。
  */
 object SignalEngine {
@@ -71,9 +72,9 @@ object SignalEngine {
                 val last = lastSignalIndex[side]
                 if (last != null && i - last < window) continue
                 val inWindow = events.filter { it.side == side && it.index in (i - window + 1)..i }
-                // 每個指標只取窗口內最近一次事件
+                // 每個類型只取窗口內最近一次事件（全部列入訊號說明）；確認數以指標計
                 val distinct = inWindow.groupBy { it.source }.map { (_, list) -> list.maxBy { it.index } }
-                if (distinct.size >= required) {
+                if (distinct.map { it.source.indicator }.toSet().size >= required) {
                     signals += TradeSignal(
                         index = i,
                         date = candles[i].date,

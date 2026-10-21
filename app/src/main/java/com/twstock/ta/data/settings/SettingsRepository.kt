@@ -50,7 +50,8 @@ class SettingsRepository(context: Context) {
                 useMacd = p[USE_MACD] ?: d.useMacd,
                 macdCross = p[MACD_CROSS] ?: d.macdCross,
                 macdHistogramTurn = p[MACD_HIST_TURN] ?: d.macdHistogramTurn,
-                minConfirmations = p[MIN_CONFIRM] ?: d.minConfirmations,
+                // 舊版以規則計可存到 5，現改以指標計（1–3）
+                minConfirmations = (p[MIN_CONFIRM] ?: d.minConfirmations).coerceIn(1, 3),
                 confirmWindow = p[CONFIRM_WINDOW] ?: d.confirmWindow,
             ),
             notificationsEnabled = p[NOTIFY] ?: true,

@@ -1,5 +1,6 @@
 package com.twstock.ta.ui.detail
 
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -209,7 +211,7 @@ private fun SignalModeSelector(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("確認方式", style = MaterialTheme.typography.labelMedium)
-                (1..params.enabledRuleCount).forEach { n ->
+                (1..selected.size).forEach { n ->
                     FilterChip(
                         selected = params.requiredConfirmations == n,
                         onClick = { onConfirmations(n) },
@@ -250,19 +252,13 @@ private fun SelectedBarSignals(analysis: AnalysisResult, selectedIndex: Int?, ad
                             style = MaterialTheme.typography.bodyMedium,
                         )
                     }
-                    Text(
-                        signal.summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    SignalTypes(signal)
                 }
                 events.isNotEmpty() -> {
                     Text("沒有進出場訊號（未達確認條件）", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "當日指標：" + events.joinToString("、") { it.description },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    events.groupBy { it.source.indicator }.toSortedMap().forEach { (indicator, list) ->
+                        TypeLine(indicator, list.joinToString("、") { it.description })
+                    }
                 }
                 else -> Text(
                     "這一天沒有進出場訊號",
@@ -271,6 +267,32 @@ private fun SelectedBarSignals(analysis: AnalysisResult, selectedIndex: Int?, ad
                 )
             }
         }
+    }
+}
+
+/** 依指標分組列出訊號類型，例如「[布林通道] 跌破布林下軌、布林跌破下軌後收回」。 */
+@Composable
+private fun SignalTypes(signal: TradeSignal) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        signal.groups.forEach { (indicator, events) ->
+            TypeLine(indicator, events.joinToString("、") { it.description })
+        }
+    }
+}
+
+@Composable
+private fun TypeLine(indicator: SignalIndicator, text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Top) {
+        Text(
+            indicator.label,
+            style = MaterialTheme.typography.labelSmall,
+            color = MarketColors.forIndicator(indicator),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier
+                .border(1.dp, MarketColors.forIndicator(indicator), RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
@@ -289,11 +311,7 @@ private fun SignalRow(signal: TradeSignal, adjusted: Boolean, onClick: () -> Uni
         Text(if (buy) "▲ 買" else "▼ 賣", color = color, fontWeight = FontWeight.Bold)
         Column(Modifier.weight(1f)) {
             Text("${signal.date}　${if (adjusted) "還原收盤" else "收盤"} %.2f".format(signal.price), style = MaterialTheme.typography.bodyMedium)
-            Text(
-                signal.summary,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SignalTypes(signal)
         }
     }
 }

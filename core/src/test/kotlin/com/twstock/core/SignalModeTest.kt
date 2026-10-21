@@ -48,28 +48,47 @@ class SignalModeTest {
     }
 
     @Test
-    fun multiSelect_usesMinConfirmations_countingEachRule() {
+    fun multiSelect_countsIndicators_notTypes() {
         val all = IndicatorParams()
         assertEquals(2, all.requiredConfirmations)
-        // 布林突破＋布林收回分開計算，可互相確認 → 11；KD＋MACD → 16
-        assertEquals(listOf(11, 16), SignalEngine.confirmSignals(candles, events, all).map { it.index })
+        // 布林突破＋布林收回同屬布林通道，不能互相確認；KD＋MACD → 16
+        assertEquals(listOf(16), SignalEngine.confirmSignals(candles, events, all).map { it.index })
         val any = all.copy(minConfirmations = 1)
         assertEquals(listOf(2, 6, 10, 15), SignalEngine.confirmSignals(candles, events, any).map { it.index })
     }
 
     @Test
-    fun requiredConfirmations_clampedToEnabledRules() {
-        // KD、MACD 交叉、MACD 柱狀轉折共 3 個規則
-        val kdMacd = IndicatorParams(bollingerSignals = false, minConfirmations = 4)
-        assertEquals(3, kdMacd.requiredConfirmations)
+    fun requiredConfirmations_clampedToSelectedIndicators() {
+        // 只選 KD、MACD 兩個指標
+        val kdMacd = IndicatorParams(bollingerSignals = false, minConfirmations = 3)
+        assertEquals(2, kdMacd.requiredConfirmations)
         assertTrue(kdMacd.validate().isEmpty())
+    }
+
+    @Test
+    fun bollingerOnly_bothTypesSameDay_mergedIntoOneSignalWithBothTypes() {
+        val sameDay = listOf(ev(10, SignalSource.BOLLINGER_BREAKOUT), ev(10, SignalSource.BOLLINGER))
+        val s = SignalEngine.confirmSignals(candles, sameDay, bbOnly).single()
+        assertEquals(setOf(SignalSource.BOLLINGER_BREAKOUT, SignalSource.BOLLINGER), s.events.map { it.source }.toSet())
+        assertEquals(listOf(SignalIndicator.BOLLINGER), s.groups.map { it.first })
+    }
+
+    @Test
+    fun summary_groupsTypesByIndicator() {
+        val s = SignalEngine.confirmSignals(
+            candles,
+            listOf(ev(4, SignalSource.MACD_HISTOGRAM), ev(5, SignalSource.KD), ev(5, SignalSource.BOLLINGER_BREAKOUT)),
+            IndicatorParams(),
+        ).single()
+        assertEquals(listOf(SignalIndicator.BOLLINGER, SignalIndicator.KD, SignalIndicator.MACD), s.groups.map { it.first })
+        assertEquals("布林通道：布林突破｜KD：KD｜MACD：MACD 柱狀轉折", s.summary)
     }
 
     @Test
     fun describeSignalMode() {
         assertEquals("只看KD", kdOnly.describeSignalMode())
         assertEquals("只看布林通道", bbOnly.describeSignalMode())
-        assertEquals("布林通道＋KD＋MACD：3 日內至少 2 個同向", IndicatorParams().describeSignalMode())
+        assertEquals("布林通道＋KD＋MACD：3 日內至少 2 個指標同向", IndicatorParams().describeSignalMode())
         assertEquals("KD＋MACD：任一觸發", IndicatorParams(bollingerSignals = false, minConfirmations = 1).describeSignalMode())
     }
 

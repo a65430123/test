@@ -51,8 +51,8 @@ data class IndicatorParams(
     /** MACD 柱狀轉折訊號（正柱狀由最高點第一根往下賣、負柱狀由最低點第一根往上買） */
     val macdHistogramTurn: Boolean = true,
     /**
-     * 多選指標時，同方向需有幾個不同規則確認才產生進出場訊號
-     * （布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）。只選一個指標時不適用。
+     * 多選指標時，同方向需有幾個不同指標（布林通道、KD、MACD）確認才產生進出場訊號；
+     * 同一指標的多種訊號類型只算一個。只選一個指標時不適用（該指標任一類型即為訊號）。
      */
     val minConfirmations: Int = 2,
     /** 確認視窗（交易日）：在此天數內出現的同方向指標事件可互相確認。 */
@@ -71,23 +71,18 @@ data class IndicatorParams(
             if (macdCrossActive || macdHistogramActive) add(SignalIndicator.MACD)
         }
 
-    /** 實際啟用的訊號規則數（布林收回、布林突破、MACD 交叉、MACD 柱狀轉折分開計算）。 */
-    val enabledRuleCount: Int
-        get() = listOf(bollingerPullbackActive, bollingerBreakoutActive, useKd, macdCrossActive, macdHistogramActive)
-            .count { it }
-
-    /** 實際需要的確認數：只選一個指標時為 1，多選時為 minConfirmations（不超過啟用的規則數）。 */
+    /** 實際需要的確認指標數：只選一個指標時為 1，多選時為 minConfirmations（不超過已選指標數）。 */
     val requiredConfirmations: Int
-        get() = if (selectedIndicators.size <= 1) 1 else minConfirmations.coerceIn(1, enabledRuleCount)
+        get() = if (selectedIndicators.size <= 1) 1 else minConfirmations.coerceIn(1, selectedIndicators.size)
 
-    /** 例如「只看 KD」、「布林通道＋KD＋MACD：3 日內至少 2 個同向」。 */
+    /** 例如「只看 KD」、「布林通道＋KD＋MACD：3 日內至少 2 個指標同向」。 */
     fun describeSignalMode(): String {
         val names = selectedIndicators.joinToString("＋") { it.label }
         return when {
             selectedIndicators.isEmpty() -> "未選擇訊號來源"
             selectedIndicators.size == 1 -> "只看$names"
             requiredConfirmations == 1 -> "$names：任一觸發"
-            else -> "$names：${confirmWindow} 日內至少 $requiredConfirmations 個同向"
+            else -> "$names：${confirmWindow} 日內至少 $requiredConfirmations 個指標同向"
         }
     }
 
@@ -123,7 +118,7 @@ data class IndicatorParams(
         if (macdFast !in 1..250 || macdSlow !in 1..250 || macdSignal !in 1..250) add("MACD 週期需介於 1–250")
         if (macdFast >= macdSlow) add("MACD 快線週期需小於慢線週期")
         if (selectedIndicators.isEmpty()) add("至少需選擇一個指標作為訊號來源")
-        if (minConfirmations !in 1..5) add("確認指標數需介於 1–5")
+        if (minConfirmations !in 1..3) add("確認指標數需介於 1–3")
         if (confirmWindow !in 1..20) add("確認視窗需介於 1–20 日")
     }
 }

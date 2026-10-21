@@ -159,8 +159,8 @@ fun SettingsScreen(
                     }
                 }
                 Hint(
-                    "只選一個指標時，該指標的每個訊號都會發出。多選時，需在視窗天數內有指定數量的不同規則" +
-                        "（布林收回、布林突破、KD、MACD 交叉、MACD 柱狀轉折各算一個）給出同方向訊號；超過已啟用的規則數時以規則數計"
+                    "只選一個指標時，該指標任一類型的訊號都會發出。多選時，需在視窗天數內有指定數量的不同指標" +
+                        "（布林通道、KD、MACD）給出同方向訊號；同一指標的多種類型只算一個，確認數上限為已選指標數"
                 )
                 SwitchRow("收盤後推播通知", f.notificationsEnabled) { v -> vm.update { it.copy(notificationsEnabled = v) } }
             }

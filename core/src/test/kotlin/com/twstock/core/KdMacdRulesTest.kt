@@ -86,14 +86,13 @@ class KdMacdRulesTest {
     @Test
     fun macdRules_selectionAndCounting() {
         val p = IndicatorParams()
-        assertEquals(5, p.enabledRuleCount)
         val crossOnly = p.copy(macdHistogramTurn = false)
         assertTrue(histEvents(listOf(1.0, 2.0, 1.0), crossOnly).isEmpty())
         val macdOff = p.copy(macdCross = false, macdHistogramTurn = false)
         assertEquals(listOf(SignalIndicator.BOLLINGER, SignalIndicator.KD), macdOff.selectedIndicators)
         val back = macdOff.toggleIndicator(SignalIndicator.MACD, true)
         assertTrue(back.macdCrossActive && back.macdHistogramActive)
-        assertTrue(IndicatorParams(minConfirmations = 5).validate().isEmpty())
-        assertTrue(IndicatorParams(minConfirmations = 6).validate().isNotEmpty())
+        assertTrue(IndicatorParams(minConfirmations = 3).validate().isEmpty())
+        assertTrue(IndicatorParams(minConfirmations = 4).validate().isNotEmpty())
     }
 }

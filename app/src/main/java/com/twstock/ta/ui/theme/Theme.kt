@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import com.twstock.core.model.SignalIndicator
 
 /** 台股慣例：紅漲綠跌。 */
 object MarketColors {
@@ -25,6 +26,12 @@ object MarketColors {
     val ExRight = Color(0xFF8D6E63)
     val VolumeMaShort = Color(0xFFFF9800)
     val VolumeMaLong = Color(0xFF1E88E5)
+
+    fun forIndicator(indicator: SignalIndicator): Color = when (indicator) {
+        SignalIndicator.BOLLINGER -> BollingerBand
+        SignalIndicator.KD -> K
+        SignalIndicator.MACD -> D
+    }
 
     fun forChange(change: Double?): Color = when {
         change == null || change == 0.0 -> Flat
