@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.twstock.core.AnalysisResult
 import com.twstock.core.model.IndicatorParams
 import com.twstock.core.model.SignalIndicator
 import com.twstock.core.signal.SignalSide
@@ -140,10 +142,17 @@ fun StockDetailScreen(
                         adjusted = data.adjusted,
                     )
                 }
+                item(key = "selected-bar") {
+                    SelectedBarSignals(
+                        analysis = data.analysis,
+                        selectedIndex = chartState.selectedIndex,
+                        adjusted = data.adjusted,
+                    )
+                }
                 item(key = "header") {
                     Column {
                         Text(
-                            "雙指縮放、左右拖曳平移、點選 K 棒查看數值",
+                            "雙指縮放、左右拖曳平移、點選 K 棒查看數值與當日訊號",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp),
@@ -214,6 +223,54 @@ private fun SignalModeSelector(
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+/** 點選 K 棒時，顯示該日的進出場訊號；沒有訊號但有指標事件時一併列出（未達確認）。 */
+@Composable
+private fun SelectedBarSignals(analysis: AnalysisResult, selectedIndex: Int?, adjusted: Boolean) {
+    val index = selectedIndex ?: return
+    val bar = analysis.candles.getOrNull(index) ?: return
+    val signals = analysis.signals.filter { it.index == index }
+    val events = analysis.events.filter { it.index == index }
+    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("${bar.date} 的進出場訊號", style = MaterialTheme.typography.titleSmall)
+            when {
+                signals.isNotEmpty() -> signals.forEach { signal ->
+                    val buy = signal.side == SignalSide.BUY
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (buy) "▲ 買進訊號" else "▼ 賣出訊號",
+                            color = if (buy) MarketColors.Up else MarketColors.Down,
+                            fontWeight = FontWeight.Bold,
+                        )
+                        Text(
+                            "${if (adjusted) "還原收盤" else "收盤"} %.2f".format(signal.price),
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
+                    Text(
+                        signal.summary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                events.isNotEmpty() -> {
+                    Text("沒有進出場訊號（未達確認條件）", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "當日指標：" + events.joinToString("、") { it.description },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                else -> Text(
+                    "這一天沒有進出場訊號",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 
