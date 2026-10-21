@@ -9,11 +9,13 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.twstock.ta.ui.detail.StockDetailScreen
+import com.twstock.ta.ui.screener.ScreenerScreen
 import com.twstock.ta.ui.settings.SettingsScreen
 import com.twstock.ta.ui.watchlist.WatchlistScreen
 
 object Routes {
     const val WATCHLIST = "watchlist"
+    const val SCREENER = "screener"
     const val SETTINGS = "settings"
     const val DETAIL = "detail/{code}"
     fun detail(code: String) = "detail/${Uri.encode(code)}"
@@ -33,11 +35,27 @@ fun AppNavHost(pendingStockCode: String?, onPendingConsumed: () -> Unit) {
         }
     }
 
+    // 底部導覽切換：保留單一自選股頁在堆疊底層
+    val switchTab: (String) -> Unit = { route ->
+        nav.navigate(route) {
+            popUpTo(Routes.WATCHLIST)
+            launchSingleTop = true
+        }
+    }
+
     NavHost(navController = nav, startDestination = Routes.WATCHLIST) {
         composable(Routes.WATCHLIST) {
             WatchlistScreen(
                 onOpenStock = { nav.navigate(Routes.detail(it)) },
                 onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+                onNavigate = switchTab,
+            )
+        }
+        composable(Routes.SCREENER) {
+            ScreenerScreen(
+                onOpenStock = { nav.navigate(Routes.detail(it)) },
+                onOpenSettings = { nav.navigate(Routes.SETTINGS) },
+                onNavigate = switchTab,
             )
         }
         composable(

@@ -57,6 +57,29 @@ data class ExRightEntity(
     fun toModel() = ExRightEvent(LocalDate.ofEpochDay(epochDay), closeBefore, referencePrice)
 }
 
+/** 選股用的全市場日 K（僅保留最近 [com.twstock.ta.data.repository.StockRepository.MARKET_DAYS] 個交易日）。 */
+@Entity(tableName = "market_candles", primaryKeys = ["code", "epochDay"])
+data class MarketCandleEntity(
+    val code: String,
+    val epochDay: Long,
+    val open: Double,
+    val high: Double,
+    val low: Double,
+    val close: Double,
+    /** 成交量（張） */
+    val volume: Long,
+) {
+    fun toModel() = Candle(LocalDate.ofEpochDay(epochDay), open, high, low, close, volume)
+}
+
+/** 已查詢過的市場日期；hasData = false 表示休市，不再重複查詢。 */
+@Entity(tableName = "market_days", primaryKeys = ["market", "epochDay"])
+data class MarketDayEntity(
+    val market: Market,
+    val epochDay: Long,
+    val hasData: Boolean,
+)
+
 /** 自選股清單列：自選股 + 最新兩日收盤價。 */
 data class WatchlistRow(
     val code: String,

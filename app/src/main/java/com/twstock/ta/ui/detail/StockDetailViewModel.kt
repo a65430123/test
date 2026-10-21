@@ -28,6 +28,7 @@ data class DetailUiState(
     val marketLabel: String = "",
     val isRefreshing: Boolean = false,
     val error: String? = null,
+    val inWatchlist: Boolean = true,
 )
 
 data class ChartData(
@@ -68,8 +69,14 @@ class StockDetailViewModel(
 
     init {
         viewModelScope.launch {
-            repo.getWatchlistItem(code)?.let { item ->
-                _state.update { it.copy(name = item.name, marketLabel = item.market.label) }
+            val item = repo.getWatchlistItem(code)
+            val info = if (item == null) repo.getStockInfo(code) else null
+            _state.update {
+                it.copy(
+                    name = item?.name ?: info?.name ?: code,
+                    marketLabel = (item?.market ?: info?.market)?.label.orEmpty(),
+                    inWatchlist = item != null,
+                )
             }
             refresh()
         }
@@ -94,14 +101,23 @@ class StockDetailViewModel(
         }
     }
 
+    fun addToWatchlist() {
+        viewModelScope.launch {
+            runCatching { repo.addToWatchlist(code) }
+                .onSuccess { _state.update { it.copy(inWatchlist = true) } }
+                .onFailure { e -> _state.update { it.copy(error = e.message ?: "加入失敗") } }
+        }
+    }
+
     fun refresh() {
         if (_state.value.isRefreshing) return
         viewModelScope.launch {
-            val item = repo.getWatchlistItem(code) ?: return@launch
+            // 從選股頁開啟的非自選股，以股票清單的市場別下載
+            val market = repo.getWatchlistItem(code)?.market ?: repo.getStockInfo(code)?.market ?: return@launch
             _state.update { it.copy(isRefreshing = true, error = null) }
             val result = runCatching {
                 if (settingsRepo.settings.first().adjustPrices) repo.syncExRights()
-                repo.refreshCandles(item.code, item.market)
+                repo.refreshCandles(code, market)
             }
             _state.update {
                 it.copy(

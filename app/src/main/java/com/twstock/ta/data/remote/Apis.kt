@@ -13,6 +13,14 @@ interface TwseApi {
         @Query("response") response: String = "json",
     ): TwseTableResponse
 
+    /** 上市每日收盤行情（全部，不含權證、牛熊證），日期格式 yyyyMMdd */
+    @GET("rwd/zh/afterTrading/MI_INDEX")
+    suspend fun dailyQuotes(
+        @Query("date") date: String,
+        @Query("type") type: String = "ALLBUT0999",
+        @Query("response") response: String = "json",
+    ): TwseTableResponse
+
     /** 上市除權除息計算結果表（全市場），日期格式 yyyyMMdd */
     @GET("rwd/zh/exRight/TWT49U")
     suspend fun exRights(
@@ -32,6 +40,14 @@ interface TpexApi {
     suspend fun tradingStock(
         @Query("code") code: String,
         @Query("date") date: String,
+        @Query("response") response: String = "json",
+    ): TpexTableResponse
+
+    /** 上櫃股票每日收盤行情（全部），日期格式 yyyy/MM/dd */
+    @GET("www/zh-tw/afterTrading/otc")
+    suspend fun dailyQuotes(
+        @Query("date") date: String,
+        @Query("type") type: String = "EW",
         @Query("response") response: String = "json",
     ): TpexTableResponse
 

@@ -6,11 +6,14 @@ import com.twstock.core.model.Candle
 import com.twstock.core.model.ExRightEvent
 import com.twstock.ta.data.local.AppDatabase
 import com.twstock.ta.data.local.ExRightEntity
+import com.twstock.ta.data.local.MarketCandleEntity
+import com.twstock.ta.data.local.MarketDayEntity
 import com.twstock.ta.data.local.Market
 import com.twstock.ta.data.local.StockInfoEntity
 import com.twstock.ta.data.local.WatchlistEntity
 import com.twstock.ta.data.local.WatchlistRow
 import com.twstock.ta.data.local.toEntity
+import com.twstock.ta.data.remote.DailyQuote
 import com.twstock.ta.data.remote.MarketDataParser
 import com.twstock.ta.data.remote.TpexApi
 import com.twstock.ta.data.remote.TwseApi
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
@@ -46,12 +50,14 @@ class StockRepository(
     private val watchlistDao = db.watchlistDao()
     private val candleDao = db.candleDao()
     private val exRightDao = db.exRightDao()
+    private val marketDao = db.marketDao()
 
     /** 證交所對短時間大量請求會暫時封鎖 IP，所有月資料請求共用節流。 */
     private val throttle = Mutex()
     private var lastRequestAt = 0L
 
     private val exRightSyncLock = Mutex()
+    private val marketSyncLock = Mutex()
     private var exRightsSyncedOn: LocalDate? = null
 
     fun observeWatchlist(): Flow<List<WatchlistRow>> = watchlistDao.observeRows()
@@ -119,6 +125,96 @@ class StockRepository(
             }
         }
     }
+
+    // ---- 選股（全市場日 K） ----
+
+    /**
+     * 同步上市＋上櫃全市場每日收盤行情，保留最近 [MARKET_DAYS] 個交易日（每個交易日每個市場一個請求）。
+     * 由今天往回查詢尚未下載的平日；查無資料的過去日期記為休市不再查詢，今天的資料尚未公布時下次再試。
+     * @param onProgress (已完成請求數, 預估總請求數)
+     */
+    suspend fun syncMarketDaily(onProgress: (Int, Int) -> Unit = { _, _ -> }) = marketSyncLock.withLock {
+        val today = LocalDate.now(TAIPEI)
+        val weekdays = generateSequence(today) { it.minusDays(1) }
+            .filter { it.dayOfWeek != DayOfWeek.SATURDAY && it.dayOfWeek != DayOfWeek.SUNDAY }
+            .take(MARKET_DAYS * 3 / 2)
+            .toList()
+        val known = Market.entries.associateWith { m -> marketDao.days(m).associateBy { it.epochDay } }
+        val estimate = Market.entries.sumOf { m -> pendingDays(weekdays, known.getValue(m)) }
+        var done = 0
+        for (market in Market.entries) {
+            val days = known.getValue(market)
+            var trading = 0
+            for (date in weekdays) {
+                if (trading >= MARKET_DAYS) break
+                val epochDay = date.toEpochDay()
+                val k = days[epochDay]
+                if (k != null) {
+                    if (k.hasData) trading++
+                    continue
+                }
+                val quotes = fetchDailyQuotes(market, date)
+                    .filter { MarketDataParser.isStock(it.code) || MarketDataParser.isEtf(it.code) }
+                onProgress(++done, maxOf(estimate, done))
+                if (quotes.isNotEmpty()) {
+                    marketDao.upsertCandles(quotes.map {
+                        val c = it.candle
+                        MarketCandleEntity(it.code, epochDay, c.open, c.high, c.low, c.close, c.volume)
+                    })
+                    infoDao.upsertAll(quotes.map { StockInfoEntity(it.code, it.name, market) })
+                    marketDao.upsertDay(MarketDayEntity(market, epochDay, hasData = true))
+                    trading++
+                } else if (date.isBefore(today)) {
+                    marketDao.upsertDay(MarketDayEntity(market, epochDay, hasData = false))
+                }
+            }
+        }
+        val oldest = weekdays.last().toEpochDay()
+        marketDao.pruneCandles(oldest)
+        marketDao.pruneDays(oldest)
+    }
+
+    /** 湊滿 [MARKET_DAYS] 個交易日預估還需查詢的天數（未查過的日子先當作交易日）。 */
+    private fun pendingDays(weekdays: List<LocalDate>, known: Map<Long, MarketDayEntity>): Int {
+        var trading = 0
+        var pending = 0
+        for (date in weekdays) {
+            if (trading >= MARKET_DAYS) break
+            val k = known[date.toEpochDay()]
+            if (k == null) pending++
+            if (k == null || k.hasData) trading++
+        }
+        return pending
+    }
+
+    private suspend fun fetchDailyQuotes(market: Market, date: LocalDate): List<DailyQuote> = throttled {
+        when (market) {
+            Market.TWSE -> twse.dailyQuotes(date.format(TWSE_DATE)).let { r ->
+                val t = MarketDataParser.pickTable(r.tables, "代號", "收盤")
+                if (t != null) MarketDataParser.parseDailyQuotes(t.fields, t.data, date)
+                else MarketDataParser.parseDailyQuotes(r.fields, r.data, date)
+            }
+            Market.TPEX -> tpex.dailyQuotes(date.format(TPEX_DATE)).let { r ->
+                val t = MarketDataParser.pickTable(r.tables, "代號", "收盤")
+                MarketDataParser.parseDailyQuotes(t?.fields, t?.data ?: r.aaData, date)
+            }
+        }
+    }
+
+    /** 全市場日 K（股票代號 → 舊到新）。 */
+    suspend fun getMarketSeries(): Map<String, List<Candle>> =
+        marketDao.allCandles().groupBy({ it.code }, { it.toModel() })
+
+    suspend fun latestMarketDay(): LocalDate? = marketDao.latestTradingDay()?.let(LocalDate::ofEpochDay)
+
+    fun observeMarketChanges(): Flow<Int> = marketDao.observeDayCount()
+
+    suspend fun getAllExRights(): Map<String, List<ExRightEvent>> =
+        exRightDao.getAll().groupBy({ it.code }, { it.toModel() })
+
+    suspend fun getStockInfoMap(): Map<String, StockInfoEntity> = infoDao.getAll().associateBy { it.code }
+
+    suspend fun getStockInfo(code: String): StockInfoEntity? = infoDao.get(code)
 
     suspend fun getWatchlist(): List<WatchlistEntity> = watchlistDao.getAll()
 
@@ -237,6 +333,8 @@ class StockRepository(
         const val HISTORY_MONTHS = 12
         const val MIN_REQUEST_INTERVAL_MS = 1_500L
         private const val EX_RIGHT_CHUNK_MONTHS = 3L
+        /** 選股保留的交易日數（首次同步約 2 × 65 個請求、約 3 分鐘） */
+        const val MARKET_DAYS = 60
         private val TWSE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val TPEX_DATE = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     }

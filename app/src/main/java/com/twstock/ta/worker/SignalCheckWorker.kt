@@ -56,6 +56,8 @@ class SignalCheckWorker(
                 repo.markNotified(item.code, signal.date)
             }
         }
+        // 順便更新選股用的全市場資料（首次較久，之後每天 2 個請求）
+        runCatching { repo.syncMarketDaily() }
         return if (failures == watchlist.size && runAttemptCount < 3) Result.retry() else Result.success()
     }
 

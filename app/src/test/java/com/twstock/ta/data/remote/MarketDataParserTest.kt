@@ -1,7 +1,9 @@
 package com.twstock.ta.data.remote
 
+import com.twstock.core.model.Candle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
 
@@ -69,6 +71,39 @@ class MarketDataParserTest {
         val r = MarketDataParser.parseExRights(fields, rows)
         assertEquals("6488", r[0].code)
         assertEquals(487.5, r[0].event.referencePrice, 1e-9)
+    }
+
+    @Test
+    fun parseDailyQuotes_twseLayout() {
+        val fields = listOf("證券代號", "證券名稱", "成交股數", "成交筆數", "成交金額", "開盤價", "最高價", "最低價", "收盤價",
+            "漲跌(+/-)", "漲跌價差", "最後揭示買價", "最後揭示買量", "最後揭示賣價", "最後揭示賣量", "本益比")
+        val rows = listOf(
+            listOf("2330", "台積電", "25,123,456", "30,000", "24,000,000,000", "960.00", "975.00", "955.00", "970.00",
+                "<p style= color:red>+</p>", "10.00", "969.00", "100", "970.00", "50", "25.1"),
+            listOf("1101", "台泥", "0", "0", "0", "--", "--", "--", "--", "", "0.00", "", "", "", "", ""),
+        )
+        val q = MarketDataParser.parseDailyQuotes(fields, rows, LocalDate.of(2024, 10, 1)).single()
+        assertEquals("2330", q.code)
+        assertEquals("台積電", q.name)
+        assertEquals(Candle(LocalDate.of(2024, 10, 1), 960.0, 975.0, 955.0, 970.0, 25_123), q.candle)
+    }
+
+    @Test
+    fun parseDailyQuotes_tpexLayout() {
+        val fields = listOf("代號", "名稱", "收盤", "漲跌", "開盤", "最高", "最低", "均價", "成交股數", "成交金額(元)", "成交筆數")
+        val rows = listOf(listOf("6488", "環球晶", "500.00", "+5.00", "495.00", "505.00", "490.00", "498.2", "1,234,000", "615,000,000", "900"))
+        val q = MarketDataParser.parseDailyQuotes(fields, rows, LocalDate.of(2024, 10, 1)).single()
+        assertEquals(Candle(LocalDate.of(2024, 10, 1), 495.0, 505.0, 490.0, 500.0, 1_234), q.candle)
+    }
+
+    @Test
+    fun pickTable_andStockCodes() {
+        val index = DataTable("價格指數", listOf("指數", "收盤指數"), listOf(listOf("發行量加權股價指數", "20,000")))
+        val quotes = DataTable("每日收盤行情", listOf("證券代號", "收盤價"), listOf(listOf("2330", "970")))
+        assertEquals(quotes, MarketDataParser.pickTable(listOf(index, quotes), "代號", "收盤"))
+        assertTrue(MarketDataParser.isStock("2330"))
+        assertTrue(!MarketDataParser.isStock("0050") && MarketDataParser.isEtf("0050") && MarketDataParser.isEtf("00878"))
+        assertTrue(!MarketDataParser.isStock("030001") && !MarketDataParser.isEtf("2330"))
     }
 
     @Test

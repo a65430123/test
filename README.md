@@ -41,6 +41,16 @@ app/    Android App
 
 KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上式）。若 9 日內最高 = 最低，RSV 以前日 K 代入（K 維持不變）。
 
+## 選股
+
+底部導覽「選股」頁：掃描上市＋上櫃全部股票，列出**最新交易日**出現進出場訊號的股票。
+
+- 判斷方式與個股頁相同：依目前的訊號來源、確認方式、細項開關與除權息還原設定。
+- 資料：證交所 MI_INDEX、櫃買中心上櫃股票行情的「全市場每日收盤行情」，每個交易日每個市場一個請求，保留最近 60 個交易日。首次下載約 2 × 65 個請求、約 3 分鐘（有進度條）；之後每天只需 2 個請求，背景排程（每日 14:30）也會順便更新。查無資料的過去日期記為休市不再查詢。
+- 只掃描普通股（4 碼）與 ETF（00 開頭，預設不顯示）；資料不足 35 根 K 棒的股票略過。
+- 篩選：方向（全部／買進／賣出）、市場（全部／上市／上櫃）、含 ETF、最低成交量（預設 ≥500 張）。結果依成交量排序，顯示收盤、漲跌幅、成交量與訊號類型。
+- 點選股票開啟個股頁（下載完整日 K）；不在自選股時右上角可「加入自選股」。
+
 ## 圖表操作
 
 - 雙指縮放、左右拖曳平移。
@@ -90,6 +100,8 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 | 上櫃日 K（每次一個月） | `https://www.tpex.org.tw/www/zh-tw/afterTrading/tradingStock?code=XXXX&date=yyyy/MM/dd&response=json` |
 | 上市除權息 | `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?startDate=yyyyMMdd&endDate=yyyyMMdd&response=json` |
 | 上櫃除權息 | `https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ?startDate=yyyy/MM/dd&endDate=yyyy/MM/dd&response=json` |
+| 上市全市場行情（選股） | `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=yyyyMMdd&type=ALLBUT0999&response=json` |
+| 上櫃全市場行情（選股） | `https://www.tpex.org.tw/www/zh-tw/afterTrading/otc?date=yyyy/MM/dd&type=EW&response=json` |
 | 上市股票清單 | `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL` |
 | 上櫃股票清單 | `https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes` |
 

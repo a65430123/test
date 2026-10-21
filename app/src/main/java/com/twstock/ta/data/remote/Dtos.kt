@@ -11,6 +11,8 @@ data class TwseTableResponse(
     @SerializedName("title") val title: String?,
     @SerializedName("fields") val fields: List<String>?,
     @SerializedName("data") val data: List<List<String>>?,
+    // rwd 版 MI_INDEX 等以多個表格回傳
+    @SerializedName("tables") val tables: List<DataTable>?,
 )
 
 /**
@@ -19,12 +21,13 @@ data class TwseTableResponse(
  */
 data class TpexTableResponse(
     @SerializedName("stat") val stat: String?,
-    @SerializedName("tables") val tables: List<TpexTable>?,
+    @SerializedName("tables") val tables: List<DataTable>?,
     // 舊版 st43_result.php 格式
     @SerializedName("aaData") val aaData: List<List<String>>?,
 )
 
-data class TpexTable(
+/** 回應中的一個表格（證交所 rwd 與櫃買中心共用）。 */
+data class DataTable(
     @SerializedName("title") val title: String?,
     @SerializedName("fields") val fields: List<String>?,
     @SerializedName("data") val data: List<List<String>>?,

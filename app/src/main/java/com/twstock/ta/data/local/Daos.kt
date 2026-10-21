@@ -17,6 +17,9 @@ interface StockInfoDao {
     @Query("SELECT * FROM stock_info WHERE code = :code")
     suspend fun get(code: String): StockInfoEntity?
 
+    @Query("SELECT * FROM stock_info")
+    suspend fun getAll(): List<StockInfoEntity>
+
     @Query(
         """
         SELECT * FROM stock_info
@@ -92,6 +95,37 @@ interface ExRightDao {
     @Query("SELECT COUNT(*) FROM ex_rights")
     fun observeCount(): Flow<Int>
 
+    @Query("SELECT * FROM ex_rights")
+    suspend fun getAll(): List<ExRightEntity>
+
     @Query("SELECT MAX(epochDay) FROM ex_rights WHERE market = :market")
     suspend fun latestEpochDay(market: Market): Long?
+}
+
+@Dao
+interface MarketDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertCandles(items: List<MarketCandleEntity>)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertDay(item: MarketDayEntity)
+
+    @Query("SELECT * FROM market_days WHERE market = :market")
+    suspend fun days(market: Market): List<MarketDayEntity>
+
+    @Query("SELECT * FROM market_candles ORDER BY code, epochDay")
+    suspend fun allCandles(): List<MarketCandleEntity>
+
+    @Query("SELECT MAX(epochDay) FROM market_days WHERE hasData = 1")
+    suspend fun latestTradingDay(): Long?
+
+    /** 資料變動通知（同步進度、完成後重新掃描）。 */
+    @Query("SELECT COUNT(*) FROM market_days")
+    fun observeDayCount(): Flow<Int>
+
+    @Query("DELETE FROM market_candles WHERE epochDay < :epochDay")
+    suspend fun pruneCandles(epochDay: Long)
+
+    @Query("DELETE FROM market_days WHERE epochDay < :epochDay")
+    suspend fun pruneDays(epochDay: Long)
 }

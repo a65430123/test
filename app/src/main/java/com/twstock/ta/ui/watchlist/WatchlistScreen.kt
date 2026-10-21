@@ -55,6 +55,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.twstock.core.signal.SignalSide
 import com.twstock.ta.data.local.StockInfoEntity
 import com.twstock.ta.ui.AppViewModelProvider
+import com.twstock.ta.ui.navigation.MainBottomBar
+import com.twstock.ta.ui.navigation.Routes
 import com.twstock.ta.ui.theme.MarketColors
 import java.time.format.DateTimeFormatter
 
@@ -65,6 +67,7 @@ private val DATE_FMT = DateTimeFormatter.ofPattern("MM/dd")
 fun WatchlistScreen(
     onOpenStock: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onNavigate: (String) -> Unit,
     vm: WatchlistViewModel = viewModel(factory = AppViewModelProvider.Factory),
 ) {
     val items by vm.items.collectAsStateWithLifecycle()
@@ -96,6 +99,7 @@ fun WatchlistScreen(
         floatingActionButton = {
             FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, "加入自選股") }
         },
+        bottomBar = { MainBottomBar(Routes.WATCHLIST, onNavigate) },
         snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
         PullToRefreshBox(

@@ -4,6 +4,9 @@ import com.twstock.core.model.Candle
 import com.twstock.core.model.ExRightEvent
 import java.time.LocalDate
 
+/** 全市場每日收盤行情中的一檔股票（成交量：張）。 */
+data class DailyQuote(val code: String, val name: String, val candle: Candle)
+
 /** 除權除息計算結果表中的一筆資料。 */
 data class ExRightRecord(val code: String, val event: ExRightEvent)
 
@@ -67,6 +70,50 @@ object MarketDataParser {
             ExRightRecord(code, ExRightEvent(date, before, ref))
         }
     }
+
+    /**
+     * 全市場每日收盤行情（證交所 MI_INDEX「每日收盤行情」表、櫃買中心 otc 上櫃股票行情）。
+     * 以欄位名稱定位：代號、名稱、開盤、最高、最低、收盤、成交股數（股 → 張）。
+     * 當日無成交（價格為 "--"）的股票略過；找不到必要欄位時回傳空清單。
+     */
+    fun parseDailyQuotes(fields: List<String>?, rows: List<List<String>>?, date: LocalDate): List<DailyQuote> {
+        val names = fields.orEmpty().map { it.filterNot(Char::isWhitespace) }
+        fun col(key: String) = names.indexOfFirst { key in it }
+        val code = col("代號")
+        val name = col("名稱")
+        val open = col("開盤")
+        val high = col("最高")
+        val low = col("最低")
+        val close = col("收盤")
+        val volume = col("成交股數")
+        val cols = listOf(code, name, open, high, low, close, volume)
+        if (cols.any { it < 0 }) return emptyList()
+        return rows.orEmpty().mapNotNull { row ->
+            if (row.size <= cols.max()) return@mapNotNull null
+            val c = row[code].trim().takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val candle = Candle(
+                date = date,
+                open = parseNumber(row[open]) ?: return@mapNotNull null,
+                high = parseNumber(row[high]) ?: return@mapNotNull null,
+                low = parseNumber(row[low]) ?: return@mapNotNull null,
+                close = parseNumber(row[close]) ?: return@mapNotNull null,
+                volume = ((parseNumber(row[volume]) ?: 0.0) / 1000.0).toLong(),
+            )
+            DailyQuote(c, row[name].trim(), candle)
+        }
+    }
+
+    /** 在多表格回應中找出含有指定欄位的表格。 */
+    fun pickTable(tables: List<DataTable>?, vararg mustContain: String): DataTable? =
+        tables.orEmpty().firstOrNull { t ->
+            val names = t.fields.orEmpty().map { it.filterNot(Char::isWhitespace) }
+            mustContain.all { key -> names.any { key in it } } && !t.data.isNullOrEmpty()
+        }
+
+    /** 選股只看普通股（4 碼數字，不含 00 開頭的 ETF）與 ETF（00 開頭）。 */
+    fun isStock(code: String) = code.length == 4 && code.all(Char::isDigit) && !code.startsWith("00")
+
+    fun isEtf(code: String) = code.startsWith("00") && code.length in 4..6
 
     /** 證交所 title 範例："113年10月 2330 台積電           各日成交資訊" → "台積電" */
     fun parseTwseName(title: String?, code: String): String? {

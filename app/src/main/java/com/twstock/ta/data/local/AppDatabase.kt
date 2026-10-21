@@ -18,8 +18,11 @@ class Converters {
 }
 
 @Database(
-    entities = [StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class, ExRightEntity::class],
-    version = 2,
+    entities = [
+        StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class, ExRightEntity::class,
+        MarketCandleEntity::class, MarketDayEntity::class,
+    ],
+    version = 3,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -28,6 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchlistDao(): WatchlistDao
     abstract fun candleDao(): CandleDao
     abstract fun exRightDao(): ExRightDao
+    abstract fun marketDao(): MarketDao
 
     companion object {
         /** v2：新增除權息資料表 */
@@ -41,9 +45,24 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v3：新增選股用的全市場日 K 與市場日期表 */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `market_candles` (`code` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                        "`open` REAL NOT NULL, `high` REAL NOT NULL, `low` REAL NOT NULL, `close` REAL NOT NULL, " +
+                        "`volume` INTEGER NOT NULL, PRIMARY KEY(`code`, `epochDay`))"
+                )
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `market_days` (`market` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
+                        "`hasData` INTEGER NOT NULL, PRIMARY KEY(`market`, `epochDay`))"
+                )
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "twstock.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration()
                 .build()
     }
