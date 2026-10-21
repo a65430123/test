@@ -108,8 +108,8 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 | 上櫃除權息 | `https://www.tpex.org.tw/www/zh-tw/bulletin/exDailyQ?startDate=yyyy/MM/dd&endDate=yyyy/MM/dd&response=json` |
 | 上市全市場行情（選股） | `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=yyyyMMdd&type=ALLBUT0999&response=json` |
 | 上櫃全市場行情（選股） | `https://www.tpex.org.tw/www/zh-tw/afterTrading/otc?date=yyyy/MM/dd&type=EW&response=json` |
+| 上櫃股票清單 | 取自最近一個交易日的上櫃全市場行情（`otc`，約 150 KB；openapi 的 mainboard 清單含上萬檔權證、超過 4 MB） |
 | 上市股票清單 | `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY_ALL` |
-| 上櫃股票清單 | `https://www.tpex.org.tw/openapi/v1/tpex_mainboard_daily_close_quotes` |
 
 - 首次加入自選股會下載 12 個月資料，之後只補最後一筆所在月份到本月。
 - 證交所會封鎖短時間大量請求，所有月資料請求以 1.5 秒間隔節流（首次下載一檔約 18 秒）。
@@ -125,6 +125,10 @@ KD 的平滑係數 n 可調（K = 前日K × (n−1)/n + RSV / n，n = 3 即上�
 ./gradlew :app:testDebugUnitTest
 ./gradlew :app:assembleDebug
 ```
+
+## 已用真實資料驗證（2026-10）
+
+個股日 K（上市／上櫃）、除權除息計算結果表（上市 889 筆、上櫃 673 筆）、全市場收盤行情（上市 1,085 檔股票＋239 檔 ETF、上櫃 869 檔股票＋118 檔 ETF）、上市股票清單，皆以實際 API 回應跑過 App 的解析程式。REIT（01001T 等）與 ETN（020000 等）不納入選股。
 
 ## 已知限制 / 後續可做
 

@@ -59,10 +59,6 @@ interface TpexApi {
         @Query("response") response: String = "json",
     ): TpexTableResponse
 
-    /** 上櫃股票每日收盤行情（用於建立股票代號清單） */
-    @GET("openapi/v1/tpex_mainboard_daily_close_quotes")
-    suspend fun mainboardQuotes(): List<JsonObject>
-
     companion object {
         const val BASE_URL = "https://www.tpex.org.tw/"
     }

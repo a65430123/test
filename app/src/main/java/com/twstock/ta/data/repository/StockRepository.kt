@@ -230,10 +230,27 @@ class StockRepository(
         if (!force && infoDao.count() > 0) return
         val listed = runCatching { twseOpen.stockDayAll() }.getOrDefault(emptyList())
             .mapNotNull { it.toInfo("Code", "Name", Market.TWSE) }
-        val otc = runCatching { tpex.mainboardQuotes() }.getOrDefault(emptyList())
-            .mapNotNull { it.toInfo("SecuritiesCompanyCode", "CompanyName", Market.TPEX) }
+        val otc = runCatching { latestTpexQuotes() }.getOrDefault(emptyList())
+            .filter { MarketDataParser.isStock(it.code) || MarketDataParser.isEtf(it.code) }
+            .map { StockInfoEntity(it.code, it.name, Market.TPEX) }
         if (listed.isEmpty() && otc.isEmpty()) error("無法下載股票清單，請檢查網路連線")
         infoDao.upsertAll(listed + otc)
+    }
+
+    /**
+     * 上櫃清單取自最近一個交易日的全市場收盤行情（約 150 KB）。
+     * openapi 的 tpex_mainboard_daily_close_quotes 含上萬檔權證、超過 4 MB，行動網路下容易中斷。
+     */
+    private suspend fun latestTpexQuotes(): List<DailyQuote> {
+        var date = LocalDate.now(TAIPEI)
+        repeat(7) {
+            if (date.dayOfWeek != DayOfWeek.SATURDAY && date.dayOfWeek != DayOfWeek.SUNDAY) {
+                val quotes = fetchDailyQuotes(Market.TPEX, date)
+                if (quotes.isNotEmpty()) return quotes
+            }
+            date = date.minusDays(1)
+        }
+        return emptyList()
     }
 
     /**
