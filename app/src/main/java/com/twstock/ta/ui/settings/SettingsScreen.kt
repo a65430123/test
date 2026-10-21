@@ -146,25 +146,6 @@ fun SettingsScreen(
                 }
             }
 
-            Section("訊號預告") {
-                SwitchRow("在 K 線上標註預告（空心三角形）", f.showWarningMarkers) { v ->
-                    vm.update { it.copy(showWarningMarkers = v) }
-                }
-                FieldRow {
-                    NumberField("布林接近門檻（%）", f.bbNearPercent, Modifier.weight(1f), decimal = true) { v ->
-                        vm.update { it.copy(bbNearPercent = v) }
-                    }
-                    NumberField("KD 接近差距", f.kdNearGap, Modifier.weight(1f), decimal = true) { v ->
-                        vm.update { it.copy(kdNearGap = v) }
-                    }
-                }
-                Hint(
-                    "依已選的訊號來源提示「明日可能出現」的訊號：收盤距布林軌道在門檻內、K 與 D 差距在門檻內且朝交叉方向移動、" +
-                        "MACD 柱狀依今日變化外推明日穿越 0 軸、柱狀增（跌）幅縮小即將轉折；收盤已在軌道外則提示收回訊號。" +
-                        "預告只代表條件接近，不保證發生。"
-                )
-            }
-
             Section("訊號確認") {
                 f.toParams()?.let { p ->
                     Text("目前：${p.describeSignalMode()}", style = MaterialTheme.typography.bodyMedium)

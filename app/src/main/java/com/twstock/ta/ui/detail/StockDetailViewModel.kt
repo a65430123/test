@@ -35,7 +35,6 @@ data class ChartData(
     val params: IndicatorParams,
     val exRightDates: Set<LocalDate>,
     val adjusted: Boolean,
-    val showWarnings: Boolean,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -61,7 +60,6 @@ class StockDetailViewModel(
                         params = settings.params,
                         exRightDates = series.exRightDates,
                         adjusted = series.adjusted,
-                        showWarnings = settings.showWarningMarkers,
                     )
                 }
             }

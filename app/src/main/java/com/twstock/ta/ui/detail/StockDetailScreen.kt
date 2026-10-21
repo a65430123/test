@@ -28,7 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -45,7 +44,6 @@ import com.twstock.core.AnalysisResult
 import com.twstock.core.model.IndicatorParams
 import com.twstock.core.model.SignalIndicator
 import com.twstock.core.signal.SignalSide
-import com.twstock.core.signal.SignalWarning
 import com.twstock.core.signal.TradeSignal
 import com.twstock.ta.ui.AppViewModelProvider
 import com.twstock.ta.ui.chart.StockChart
@@ -135,9 +133,6 @@ fun StockDetailScreen(
                         onConfirmations = { n -> vm.updateSignalParams { it.copy(minConfirmations = n) } },
                     )
                 }
-                item(key = "forecast") {
-                    ForecastCard(data.analysis)
-                }
                 item(key = "chart") {
                     // 圖表內的拖曳用於平移；要捲動頁面請從圖表外開始滑動
                     StockChart(
@@ -147,7 +142,6 @@ fun StockDetailScreen(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         exRightDates = data.exRightDates,
                         adjusted = data.adjusted,
-                        showWarnings = data.showWarnings,
                     )
                 }
                 item(key = "selected-bar") {
@@ -160,7 +154,7 @@ fun StockDetailScreen(
                 item(key = "header") {
                     Column {
                         Text(
-                            "雙指縮放、左右拖曳平移、點選 K 棒查看數值與當日訊號；空心三角形為訊號預告",
+                            "雙指縮放、左右拖曳平移、點選 K 棒查看數值與當日訊號",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 12.dp),
@@ -241,7 +235,6 @@ private fun SelectedBarSignals(analysis: AnalysisResult, selectedIndex: Int?, ad
     val bar = analysis.candles.getOrNull(index) ?: return
     val signals = analysis.signals.filter { it.index == index }
     val events = analysis.events.filter { it.index == index }
-    val warnings = analysis.warnings.filter { it.index == index }
     Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text("${bar.date} 的進出場訊號", style = MaterialTheme.typography.titleSmall)
@@ -273,55 +266,6 @@ private fun SelectedBarSignals(analysis: AnalysisResult, selectedIndex: Int?, ad
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (warnings.isNotEmpty()) {
-                Text("當日預告（隔日可能出現）", style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 4.dp))
-                WarningLines(warnings)
-            }
-        }
-    }
-}
-
-/** 最新一根 K 棒的訊號預告：下一個交易日可能出現的進出場訊號。 */
-@Composable
-private fun ForecastCard(analysis: AnalysisResult) {
-    val last = analysis.candles.lastOrNull() ?: return
-    val warnings = analysis.warnings.filter { it.index == analysis.candles.lastIndex }
-    OutlinedCard(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text("明日訊號預告（${last.date} 收盤後）", style = MaterialTheme.typography.titleSmall)
-            if (warnings.isEmpty()) {
-                Text(
-                    "目前沒有接近觸發的訊號",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
-                WarningLines(warnings)
-                Text(
-                    "預告只代表條件接近，不保證發生",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-/** 依方向、再依指標分組列出預告。 */
-@Composable
-private fun WarningLines(warnings: List<SignalWarning>) {
-    SignalSide.entries.forEach { side ->
-        val list = warnings.filter { it.side == side }
-        if (list.isEmpty()) return@forEach
-        val buy = side == SignalSide.BUY
-        Text(
-            if (buy) "△ 可能買進" else "▽ 可能賣出",
-            color = if (buy) MarketColors.Up else MarketColors.Down,
-            fontWeight = FontWeight.Bold,
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        list.groupBy { it.source.indicator }.toSortedMap().forEach { (indicator, ws) ->
-            TypeLine(indicator, ws.joinToString("、") { it.description })
         }
     }
 }

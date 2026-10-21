@@ -8,8 +8,6 @@ import com.twstock.core.model.Candle
 import com.twstock.core.model.IndicatorParams
 import com.twstock.core.signal.IndicatorEvent
 import com.twstock.core.signal.SignalEngine
-import com.twstock.core.signal.SignalWarning
-import com.twstock.core.signal.SignalWarnings
 import com.twstock.core.signal.TradeSignal
 
 data class AnalysisResult(
@@ -22,8 +20,6 @@ data class AnalysisResult(
     val volumeMaLong: List<Double?>,
     val events: List<IndicatorEvent>,
     val signals: List<TradeSignal>,
-    /** 訊號預告（接近觸發的條件） */
-    val warnings: List<SignalWarning>,
 ) {
     /** 最後一根 K 棒當日產生的訊號（推播用）。 */
     val signalOnLastBar: TradeSignal?
@@ -42,7 +38,6 @@ object TechnicalAnalyzer {
         val volLong = Indicators.sma(volumes, params.volumeMaLong)
         val events = SignalEngine.detectEvents(candles, bands, kd, macd, params, volShort)
         val signals = SignalEngine.confirmSignals(candles, events, params)
-        val warnings = SignalWarnings.detect(candles, bands, kd, macd, params)
-        return AnalysisResult(candles, bands, kd, macd, volShort, volLong, events, signals, warnings)
+        return AnalysisResult(candles, bands, kd, macd, volShort, volLong, events, signals)
     }
 }

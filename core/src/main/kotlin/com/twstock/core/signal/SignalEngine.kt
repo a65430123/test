@@ -169,7 +169,7 @@ object SignalEngine {
     }
 
     /** hist[at] 是否為所在同號區段（往前連續同為正或同為負）的最高（正）或最低（負）值。 */
-    internal fun isRunExtreme(hist: List<Double?>, at: Int, positive: Boolean): Boolean {
+    private fun isRunExtreme(hist: List<Double?>, at: Int, positive: Boolean): Boolean {
         val v = hist[at] ?: return false
         var j = at - 1
         while (j >= 0) {
