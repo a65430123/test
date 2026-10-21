@@ -2,7 +2,6 @@ package com.twstock.ta
 
 import android.content.Context
 import com.twstock.ta.data.local.AppDatabase
-import com.twstock.ta.data.remote.FinMindApi
 import com.twstock.ta.data.remote.TpexApi
 import com.twstock.ta.data.remote.TwseApi
 import com.twstock.ta.data.remote.TwseOpenApi
@@ -48,7 +47,6 @@ class AppContainer(context: Context) {
         twse = retrofit(TwseApi.BASE_URL).create(TwseApi::class.java),
         tpex = retrofit(TpexApi.BASE_URL).create(TpexApi::class.java),
         twseOpen = retrofit(TwseOpenApi.BASE_URL).create(TwseOpenApi::class.java),
-        finMind = retrofit(FinMindApi.BASE_URL).create(FinMindApi::class.java),
     )
 
     val settingsRepository = SettingsRepository(context)

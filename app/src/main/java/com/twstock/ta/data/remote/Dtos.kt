@@ -1,6 +1,5 @@
 package com.twstock.ta.data.remote
 
-import com.google.gson.JsonObject
 import com.google.gson.annotations.SerializedName
 
 /**
@@ -12,8 +11,6 @@ data class TwseTableResponse(
     @SerializedName("title") val title: String?,
     @SerializedName("fields") val fields: List<String>?,
     @SerializedName("data") val data: List<List<String>>?,
-    // rwd 版 MI_MARGN 等以多個表格回傳
-    @SerializedName("tables") val tables: List<DataTable>?,
 )
 
 /**
@@ -22,21 +19,13 @@ data class TwseTableResponse(
  */
 data class TpexTableResponse(
     @SerializedName("stat") val stat: String?,
-    @SerializedName("tables") val tables: List<DataTable>?,
+    @SerializedName("tables") val tables: List<TpexTable>?,
     // 舊版 st43_result.php 格式
     @SerializedName("aaData") val aaData: List<List<String>>?,
 )
 
-/** 回應中的一個表格（證交所 rwd 與櫃買中心共用）。 */
-data class DataTable(
+data class TpexTable(
     @SerializedName("title") val title: String?,
     @SerializedName("fields") val fields: List<String>?,
     @SerializedName("data") val data: List<List<String>>?,
-)
-
-/** FinMind API v4 回應（https://api.finmindtrade.com/api/v4/data） */
-data class FinMindResponse(
-    @SerializedName("msg") val msg: String?,
-    @SerializedName("status") val status: Int?,
-    @SerializedName("data") val data: List<JsonObject>?,
 )

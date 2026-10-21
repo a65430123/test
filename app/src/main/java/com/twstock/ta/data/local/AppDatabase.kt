@@ -18,11 +18,8 @@ class Converters {
 }
 
 @Database(
-    entities = [
-        StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class, ExRightEntity::class,
-        InstitutionalEntity::class, MarginEntity::class, ChipSyncEntity::class,
-    ],
-    version = 3,
+    entities = [StockInfoEntity::class, WatchlistEntity::class, CandleEntity::class, ExRightEntity::class],
+    version = 2,
     exportSchema = false,
 )
 @TypeConverters(Converters::class)
@@ -31,7 +28,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun watchlistDao(): WatchlistDao
     abstract fun candleDao(): CandleDao
     abstract fun exRightDao(): ExRightDao
-    abstract fun chipDao(): ChipDao
 
     companion object {
         /** v2：新增除權息資料表 */
@@ -45,29 +41,9 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
-        /** v3：新增籌碼資料表（三大法人、融資融券、同步紀錄） */
-        val MIGRATION_2_3 = object : Migration(2, 3) {
-            override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `institutional` (`code` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
-                        "`foreignNet` INTEGER NOT NULL, `trustNet` INTEGER NOT NULL, `dealerNet` INTEGER NOT NULL, " +
-                        "`totalNet` INTEGER NOT NULL, PRIMARY KEY(`code`, `epochDay`))"
-                )
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `margin` (`code` TEXT NOT NULL, `epochDay` INTEGER NOT NULL, " +
-                        "`marginBalance` INTEGER, `marginChange` INTEGER, `shortBalance` INTEGER, `shortChange` INTEGER, " +
-                        "PRIMARY KEY(`code`, `epochDay`))"
-                )
-                db.execSQL(
-                    "CREATE TABLE IF NOT EXISTS `chip_sync` (`market` TEXT NOT NULL, `dataset` TEXT NOT NULL, " +
-                        "`epochDay` INTEGER NOT NULL, PRIMARY KEY(`market`, `dataset`, `epochDay`))"
-                )
-            }
-        }
-
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context, AppDatabase::class.java, "twstock.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2)
                 .fallbackToDestructiveMigration()
                 .build()
     }

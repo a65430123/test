@@ -94,6 +94,6 @@ class KdMacdRulesTest {
         val back = macdOff.toggleIndicator(SignalIndicator.MACD, true)
         assertTrue(back.macdCrossActive && back.macdHistogramActive)
         assertTrue(IndicatorParams(minConfirmations = 5).validate().isEmpty())
-        assertTrue(IndicatorParams(minConfirmations = 7).validate().isNotEmpty())
+        assertTrue(IndicatorParams(minConfirmations = 6).validate().isNotEmpty())
     }
 }

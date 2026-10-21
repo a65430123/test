@@ -2,21 +2,15 @@ package com.twstock.ta.data.repository
 
 import com.google.gson.JsonObject
 import com.twstock.core.PriceAdjuster
-import com.twstock.core.model.BrokerFlow
 import com.twstock.core.model.Candle
-import com.twstock.core.model.ChipDay
 import com.twstock.core.model.ExRightEvent
 import com.twstock.ta.data.local.AppDatabase
-import com.twstock.ta.data.local.ChipSyncEntity
 import com.twstock.ta.data.local.ExRightEntity
-import com.twstock.ta.data.local.InstitutionalEntity
-import com.twstock.ta.data.local.MarginEntity
 import com.twstock.ta.data.local.Market
 import com.twstock.ta.data.local.StockInfoEntity
 import com.twstock.ta.data.local.WatchlistEntity
 import com.twstock.ta.data.local.WatchlistRow
 import com.twstock.ta.data.local.toEntity
-import com.twstock.ta.data.remote.FinMindApi
 import com.twstock.ta.data.remote.MarketDataParser
 import com.twstock.ta.data.remote.TpexApi
 import com.twstock.ta.data.remote.TwseApi
@@ -47,21 +41,17 @@ class StockRepository(
     private val twse: TwseApi,
     private val tpex: TpexApi,
     private val twseOpen: TwseOpenApi,
-    private val finMind: FinMindApi,
 ) {
     private val infoDao = db.stockInfoDao()
     private val watchlistDao = db.watchlistDao()
     private val candleDao = db.candleDao()
     private val exRightDao = db.exRightDao()
-    private val chipDao = db.chipDao()
 
     /** 證交所對短時間大量請求會暫時封鎖 IP，所有月資料請求共用節流。 */
     private val throttle = Mutex()
     private var lastRequestAt = 0L
 
     private val exRightSyncLock = Mutex()
-    private val chipSyncLock = Mutex()
-    private val brokerCache = HashMap<String, List<BrokerFlow>>()
     private var exRightsSyncedOn: LocalDate? = null
 
     fun observeWatchlist(): Flow<List<WatchlistRow>> = watchlistDao.observeRows()
@@ -128,114 +118,6 @@ class StockRepository(
                 MarketDataParser.parseExRights(table?.fields, table?.data ?: r.aaData)
             }
         }
-    }
-
-    // ---- 籌碼 ----
-
-    suspend fun getChips(code: String): List<ChipDay> =
-        mergeChips(chipDao.getInstitutional(code), chipDao.getMargin(code))
-
-    fun observeChips(code: String): Flow<List<ChipDay>> =
-        combine(chipDao.observeInstitutional(code), chipDao.observeMargin(code)) { inst, margin ->
-            mergeChips(inst, margin)
-        }
-
-    /** 籌碼資料有新下載時發出新值。 */
-    fun observeChipChanges(): Flow<Int> = chipDao.observeSyncCount()
-
-    private fun mergeChips(inst: List<InstitutionalEntity>, margin: List<MarginEntity>): List<ChipDay> {
-        val instByDay = inst.associateBy { it.epochDay }
-        val marginByDay = margin.associateBy { it.epochDay }
-        return (instByDay.keys + marginByDay.keys).sorted().map { day ->
-            val i = instByDay[day]
-            val m = marginByDay[day]
-            ChipDay(
-                date = LocalDate.ofEpochDay(day),
-                foreignNet = i?.foreignNet,
-                trustNet = i?.trustNet,
-                dealerNet = i?.dealerNet,
-                totalNet = i?.totalNet,
-                marginBalance = m?.marginBalance,
-                marginChange = m?.marginChange,
-                shortBalance = m?.shortBalance,
-                shortChange = m?.shortChange,
-            )
-        }
-    }
-
-    /**
-     * 同步自選股所在市場最近 [CHIP_DAYS] 個交易日的三大法人與融資融券（全市場、每日一個請求）。
-     * 已下載的日期不再請求；當日資料尚未公布（回傳空）時不標記，下次再試。較舊的資料會刪除。
-     */
-    suspend fun syncChips() = chipSyncLock.withLock {
-        val days = candleDao.recentTradingDays(CHIP_DAYS)
-        if (days.isEmpty()) return@withLock
-        val markets = watchlistDao.getAll().map { it.market }.toSet()
-        for (market in markets) {
-            for (dataset in listOf(DATASET_INSTITUTIONAL, DATASET_MARGIN)) {
-                val synced = chipDao.syncedDays(market, dataset).toSet()
-                for (day in days) {
-                    if (day in synced) continue
-                    if (fetchChipDay(market, dataset, LocalDate.ofEpochDay(day))) {
-                        chipDao.markSynced(ChipSyncEntity(market, dataset, day))
-                    }
-                }
-            }
-        }
-        val oldest = days.min()
-        chipDao.pruneInstitutional(oldest)
-        chipDao.pruneMargin(oldest)
-        chipDao.pruneSync(oldest)
-    }
-
-    /** @return 是否取得資料 */
-    private suspend fun fetchChipDay(market: Market, dataset: String, date: LocalDate): Boolean = throttled {
-        val day = date.toEpochDay()
-        if (dataset == DATASET_INSTITUTIONAL) {
-            val records = when (market) {
-                Market.TWSE -> twse.institutional(date.format(TWSE_DATE)).let { r ->
-                    if (r.stat.equals("OK", ignoreCase = true)) MarketDataParser.parseInstitutional(r.fields, r.data)
-                    else emptyList()
-                }
-                Market.TPEX -> tpex.institutional(date.format(TPEX_DATE)).let { r ->
-                    val t = r.tables?.firstOrNull()
-                    MarketDataParser.parseInstitutional(t?.fields, t?.data)
-                }
-            }
-            chipDao.upsertInstitutional(records.map {
-                InstitutionalEntity(it.code, day, it.foreignNet, it.trustNet, it.dealerNet, it.totalNet)
-            })
-            records.isNotEmpty()
-        } else {
-            val records = when (market) {
-                Market.TWSE -> twse.margin(date.format(TWSE_DATE)).let { r ->
-                    val t = MarketDataParser.pickTable(r.tables, "代號", "餘額")
-                    if (t != null) MarketDataParser.parseMargin(t.fields, t.data)
-                    else MarketDataParser.parseMargin(r.fields, r.data)
-                }
-                Market.TPEX -> tpex.margin(date.format(TPEX_DATE)).let { r ->
-                    val t = MarketDataParser.pickTable(r.tables, "代號", "餘額")
-                    MarketDataParser.parseMargin(t?.fields, t?.data)
-                }
-            }
-            chipDao.upsertMargin(records.map {
-                MarginEntity(it.code, day, it.marginBalance, it.marginChange, it.shortBalance, it.shortChange)
-            })
-            records.isNotEmpty()
-        }
-    }
-
-    /**
-     * 分點券商進出（FinMind，需 token）。結果依股票＋日期快取於記憶體。
-     * @throws IllegalStateException token 無效、額度不足等 API 錯誤（訊息取自 FinMind）
-     */
-    suspend fun getBrokerFlows(code: String, date: LocalDate, token: String): List<BrokerFlow> {
-        val key = "$code@$date"
-        brokerCache[key]?.let { return it }
-        val d = date.format(DateTimeFormatter.ISO_LOCAL_DATE)
-        val r = finMind.data("Bearer ${token.trim()}", FinMindApi.BROKER_DATASET, code, d, d)
-        if (r.status != null && r.status != 200) error(r.msg ?: "FinMind 回應錯誤 ${r.status}")
-        return MarketDataParser.parseBrokerFlows(r.data).also { if (it.isNotEmpty()) brokerCache[key] = it }
     }
 
     suspend fun getWatchlist(): List<WatchlistEntity> = watchlistDao.getAll()
@@ -355,10 +237,6 @@ class StockRepository(
         const val HISTORY_MONTHS = 12
         const val MIN_REQUEST_INTERVAL_MS = 1_500L
         private const val EX_RIGHT_CHUNK_MONTHS = 3L
-        /** 籌碼資料保留的交易日數（首次同步每個市場約 2 × 20 個請求） */
-        const val CHIP_DAYS = 20
-        private const val DATASET_INSTITUTIONAL = "institutional"
-        private const val DATASET_MARGIN = "margin"
         private val TWSE_DATE = DateTimeFormatter.ofPattern("yyyyMMdd")
         private val TPEX_DATE = DateTimeFormatter.ofPattern("yyyy/MM/dd")
     }

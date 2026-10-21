@@ -39,18 +39,17 @@ class SignalCheckWorker(
         if (settings.adjustPrices) runCatching { repo.syncExRights() }
 
         var failures = 0
-        val refreshed = watchlist.filter { item ->
-            runCatching { repo.refreshCandles(item.code, item.market) }.onFailure { failures++ }.isSuccess
-        }
-        // 籌碼依 K 棒的交易日同步，需在更新 K 棒之後
-        if (settings.params.useChips) runCatching { repo.syncChips() }
-
-        for (item in refreshed) {
+        for (item in watchlist) {
+            try {
+                repo.refreshCandles(item.code, item.market)
+            } catch (e: Exception) {
+                failures++
+                continue
+            }
             if (!settings.notificationsEnabled) continue
             val candles = repo.getPriceSeries(item.code, settings.adjustPrices).candles
             if (candles.isEmpty()) continue
-            val signal = TechnicalAnalyzer.analyze(candles, settings.params, repo.getChips(item.code))
-                .signalOnLastBar ?: continue
+            val signal = TechnicalAnalyzer.analyze(candles, settings.params).signalOnLastBar ?: continue
             val latest = repo.getWatchlistItem(item.code) ?: continue
             if (signal.date.toEpochDay() > latest.lastNotifiedEpochDay) {
                 SignalNotifier.notify(applicationContext, item.code, item.name, signal)

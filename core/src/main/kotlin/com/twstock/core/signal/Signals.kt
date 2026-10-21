@@ -10,7 +10,6 @@ enum class SignalSource(val label: String) {
     KD("KD"),
     MACD("MACD 交叉"),
     MACD_HISTOGRAM("MACD 柱狀轉折"),
-    CHIPS("法人連續買賣超"),
 }
 
 /** 單一指標在某日觸發的事件。 */

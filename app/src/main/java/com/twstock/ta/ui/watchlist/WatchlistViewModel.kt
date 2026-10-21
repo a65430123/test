@@ -56,12 +56,11 @@ class WatchlistViewModel(
             repo.observeWatchlist(),
             settingsRepo.settings,
             repo.observeExRightsChanges(),
-            repo.observeChipChanges(),
-        ) { rows, settings, _, _ ->
+        ) { rows, settings, _ ->
             rows.map { row ->
                 val candles = repo.getPriceSeries(row.code, settings.adjustPrices).candles
                 val signal = if (candles.isEmpty()) null
-                else TechnicalAnalyzer.analyze(candles, settings.params, repo.getChips(row.code)).signals.lastOrNull()
+                else TechnicalAnalyzer.analyze(candles, settings.params).signals.lastOrNull()
                 val change = if (row.lastClose != null && row.prevClose != null) row.lastClose - row.prevClose else null
                 WatchlistItemUi(
                     code = row.code,
@@ -120,7 +119,6 @@ class WatchlistViewModel(
                 query.value = ""
                 showMessage("已加入 ${entity.code} ${entity.name}，下載歷史資料中…")
                 repo.refreshCandles(entity.code, entity.market)
-                runCatching { repo.syncChips() }
             } catch (e: Exception) {
                 showMessage(e.message ?: "加入失敗")
             }
@@ -143,7 +141,6 @@ class WatchlistViewModel(
                 runCatching { repo.refreshCandles(item.code, item.market) }
                     .onFailure { failed += item.code }
             }
-            runCatching { repo.syncChips() }.onFailure { failed += "籌碼資料" }
             _state.update {
                 it.copy(
                     isRefreshing = false,

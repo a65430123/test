@@ -5,8 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.twstock.core.AnalysisResult
 import com.twstock.core.TechnicalAnalyzer
-import com.twstock.core.model.BrokerFlow
-import com.twstock.core.model.ChipDay
 import com.twstock.core.model.IndicatorParams
 import com.twstock.ta.data.repository.StockRepository
 import com.twstock.ta.data.settings.SettingsRepository
@@ -16,10 +14,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -37,18 +35,7 @@ data class ChartData(
     val params: IndicatorParams,
     val exRightDates: Set<LocalDate>,
     val adjusted: Boolean,
-    /** 最近的籌碼資料（舊到新） */
-    val chips: List<ChipDay>,
 )
-
-/** 分點券商區塊狀態 */
-sealed interface BrokerState {
-    data object NoToken : BrokerState
-    data object Idle : BrokerState
-    data object Loading : BrokerState
-    data class Loaded(val date: LocalDate, val flows: List<BrokerFlow>) : BrokerState
-    data class Error(val message: String) : BrokerState
-}
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class StockDetailViewModel(
@@ -66,14 +53,13 @@ class StockDetailViewModel(
     val chart: StateFlow<ChartData?> =
         settingsRepo.settings
             .flatMapLatest { settings ->
-                combine(repo.observePriceSeries(code, settings.adjustPrices), repo.observeChips(code)) { series, chips ->
+                repo.observePriceSeries(code, settings.adjustPrices).map { series ->
                     if (series.candles.isEmpty()) null
                     else ChartData(
-                        analysis = TechnicalAnalyzer.analyze(series.candles, settings.params, chips),
+                        analysis = TechnicalAnalyzer.analyze(series.candles, settings.params),
                         params = settings.params,
                         exRightDates = series.exRightDates,
                         adjusted = series.adjusted,
-                        chips = chips,
                     )
                 }
             }
@@ -97,25 +83,6 @@ class StockDetailViewModel(
         }
     }
 
-    private val _broker = MutableStateFlow<BrokerState>(BrokerState.Idle)
-    val broker: StateFlow<BrokerState> = _broker.asStateFlow()
-
-    /** 載入指定交易日的分點券商進出（FinMind）。 */
-    fun loadBrokers(date: LocalDate) {
-        viewModelScope.launch {
-            val token = settingsRepo.settings.first().finMindToken
-            if (token.isBlank()) {
-                _broker.value = BrokerState.NoToken
-                return@launch
-            }
-            _broker.value = BrokerState.Loading
-            _broker.value = runCatching { repo.getBrokerFlows(code, date, token) }.fold(
-                onSuccess = { BrokerState.Loaded(date, it) },
-                onFailure = { BrokerState.Error(it.message ?: it.javaClass.simpleName) },
-            )
-        }
-    }
-
     fun setAdjustPrices(enabled: Boolean) {
         viewModelScope.launch {
             settingsRepo.setAdjustPrices(enabled)
@@ -135,7 +102,6 @@ class StockDetailViewModel(
             val result = runCatching {
                 if (settingsRepo.settings.first().adjustPrices) repo.syncExRights()
                 repo.refreshCandles(item.code, item.market)
-                repo.syncChips()
             }
             _state.update {
                 it.copy(
