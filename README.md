@@ -6,6 +6,31 @@
 - MVVM：`ViewModel` + `StateFlow`，手動 DI（`AppContainer`）
 - Room 本地資料庫、Retrofit + OkHttp 抓資料、DataStore 儲存設定、WorkManager 每日檢查訊號
 
+## 網頁版
+
+同樣的功能也有網頁版（`web/`），部署在 GitHub Pages：<https://a65430123.github.io/test/>
+
+- 畫面與流程對照 App：選股、自選股、搜尋、個股圖表（K 線＋布林、成交量、KD、MACD）、設定、深色介面。
+- 指標與訊號：`web/js/core.js`，與 `core` 模組相同的演算法與預設值（`web/test/core.test.mjs`）。
+- 自選股、設定只存在瀏覽器（localStorage）。開啟網頁時，自選股最新交易日若有新訊號，會在網頁上方提示；在設定頁允許瀏覽器通知後也會送出系統通知。
+- 網址：`#/screener`、`#/watchlist`、`#/search`、`#/settings`、`#/stock/2330`（可加入書籤或分享）。
+
+證交所以外的資料來源（櫃買中心）不允許瀏覽器跨網域讀取，所以網頁版不直接連交易所，而是由 GitHub Actions（`.github/workflows/pages.yml`）每個交易日 16:30、19:30（台北時間）執行 `scripts/fetch-data.mjs`：
+
+1. 下載上市（MI_INDEX）＋上櫃（otc）全市場日 K，保留最近 250 個交易日；除權息（TWT49U、exDailyQ）保留約 13 個月。已下載的日子存在 `data` 分支，每次只補缺少的日子（第一次約 15 分鐘）。
+2. 產生 `data/meta.json`、`stocks.json`（清單與最新收盤）、`candles/<代號>.json`（個股日 K）、`screen.json`（選股用最近 60 個交易日）、`exrights.json`。
+3. 與 `web/` 一起部署到 GitHub Pages。
+
+首次使用：Settings → Pages → Build and deployment → Source 選「GitHub Actions」，再到 Actions 手動執行「Web (daily data + Pages)」。
+
+本機試跑：
+
+```bash
+node scripts/fetch-data.mjs --store store --out site/data --days 40   # 下載 40 個交易日
+cp -r web/index.html web/css web/js site/ && python3 -m http.server -d site 8000
+node --test web/test/*.test.mjs scripts/test/*.test.mjs
+```
+
 ## 模組結構
 
 ```

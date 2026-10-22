@@ -8,3 +8,5 @@ build/
 .externalNativeBuild
 .cxx
 .kotlin/
+/site/
+/store/

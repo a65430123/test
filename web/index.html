@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-Hant-TW" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark light">
+<meta name="description" content="台股（上市＋上櫃＋ETF）日 K 技術分析：布林通道、KD、MACD、成交量與進出場訊號、選股">
+<title>台股技術分析</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23262d4c'/%3E%3Cpath d='M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z' fill='%239aa6f2'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/app.css">
+<script>
+  // 在繪製前套用外觀設定，避免閃爍（預設深色）
+  try {
+    const m = (JSON.parse(localStorage.getItem('ta-settings')) || {}).themeMode || 'DARK';
+    if (m === 'SYSTEM') delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = m === 'LIGHT' ? 'light' : 'dark';
+  } catch {}
+</script>
+</head>
+<body>
+<div class="screen" id="screen">
+  <div id="app"></div>
+  <div id="overlay"></div>
+</div>
+<noscript>請啟用 JavaScript 才能使用台股技術分析。</noscript>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

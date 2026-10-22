@@ -1,0 +1,79 @@
+# 網頁版：每個交易日收盤後下載上市＋上櫃行情與除權息，產生靜態資料並部署到 GitHub Pages。
+# 首次使用前到 Settings → Pages → Build and deployment → Source 選「GitHub Actions」。
+name: Web (daily data + Pages)
+
+on:
+  schedule:
+    - cron: '30 8 * * 1-5'   # 台北 16:30（證交所、櫃買中心盤後資料已公布）
+    - cron: '30 11 * * 1-5'  # 台北 19:30 再補一次（盤後資料延遲或上次失敗時）
+  workflow_dispatch:
+  push:
+    branches: [claude/admiring-feynman-ye9peu]
+    paths: ['web/**', 'scripts/**', '.github/workflows/pages.yml']
+
+permissions:
+  contents: write   # 寫入 data 分支（原始行情快取）
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test web/test/*.test.mjs scripts/test/*.test.mjs
+
+      # data 分支保存已下載的每日行情，每次只補缺少的日子；第一次執行時還不存在
+      - name: Restore data cache branch
+        id: store
+        continue-on-error: true
+        uses: actions/checkout@v4
+        with:
+          ref: data
+          path: store
+
+      - name: Fetch market data
+        run: node scripts/fetch-data.mjs --store store --out site/data
+
+      - name: Save data cache branch
+        if: always() && hashFiles('store/days/*.json') != ''
+        working-directory: store
+        run: |
+          # data 分支還不存在時（checkout 失敗可能留下空的 .git），重新建立
+          if ! git rev-parse -q --verify HEAD >/dev/null 2>&1; then
+            rm -rf .git && git init -q
+            git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          # 只保留一個提交，避免每天的行情檔讓儲存庫越來越大
+          git checkout -q --orphan snapshot
+          git add -A
+          git commit -q -m "Market data snapshot $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q -f origin snapshot:data
+
+      - name: Assemble site
+        run: cp -r web/index.html web/css web/js site/
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4
